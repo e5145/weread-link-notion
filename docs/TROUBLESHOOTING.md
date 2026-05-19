@@ -1,55 +1,101 @@
-# 排错指南
+# 常见问题排错
 
-## Actions 里没有 workflow
+先看 GitHub Actions 里的失败步骤。大多数问题都能从步骤名判断：
 
-检查 `.github/workflows/sync.yml` 是否上传到仓库。
+| 失败步骤 | 通常原因 |
+|---|---|
+| `Check connection` | `WEREAD_API_KEY`、`NOTION_TOKEN`、`NOTION_PAGE` 有问题 |
+| `Generate heatmap` | 微信读书阅读数据获取失败，或热力图生成失败 |
+| `Publish heatmap assets` | GitHub Actions 没有写仓库权限 |
+| `Sync Notion` | Notion token、页面权限或页面链接有问题 |
 
-路径必须是：
+## Actions 里没有同步任务
+
+检查仓库里是否有这个文件：
 
 ```text
 .github/workflows/sync.yml
 ```
 
-## Missing required environment variables
+注意路径必须完全一致，不能放成：
 
-说明 GitHub Secrets 没填完整。
+```text
+github/workflows/sync.yml
+```
 
-检查：
+也不能只上传 `sync.yml`。
 
-- `WEREAD_API_KEY`
-- `NOTION_TOKEN`
-- `NOTION_PAGE`
+## 报 Missing required environment variables
+
+说明 GitHub Secrets 没配好。
+
+检查仓库：
+
+```text
+Settings -> Secrets and variables -> Actions -> Secrets
+```
+
+必须有三个 secret，名字必须完全一致：
+
+```text
+WEREAD_API_KEY
+NOTION_TOKEN
+NOTION_PAGE
+```
+
+常见错误：
+
+- 少填了一个。
+- 名字大小写不一致。
+- 填到了 `Variables`，而不是 `Secrets`。
+- 填到了另一个仓库。
+
+## WeRead API Key 不通过
+
+先检查 `WEREAD_API_KEY` 是否只填了 key 本身。
+
+正确：
+
+```text
+wrk-xxxxxxxx
+```
+
+错误：
+
+```text
+Bearer wrk-xxxxxxxx
+Authorization: Bearer wrk-xxxxxxxx
+WEREAD_API_KEY=wrk-xxxxxxxx
+```
+
+如果格式没问题但仍然失败：
+
+1. 回到微信读书 Skill 页面重新复制一次 key。
+2. 确认复制时没有多余空格或换行。
+3. 在 GitHub Secrets 里删除旧值，重新创建。
+4. 重新运行 Actions。
 
 ## Notion 权限错误
 
-常见原因：
+最常见原因：Notion 页面没有授权给 integration。
 
-1. `NOTION_TOKEN` 填错。
-2. Notion 页面没有授权给 integration。
-3. `NOTION_PAGE` 不是页面 URL，而是数据库 URL。
+解决方法：
 
-解决：
+1. 打开 `NOTION_PAGE` 对应的 Notion 页面。
+2. 点击右上角 `Share` 或 `...`。
+3. 找到 `Connections` / `Add connections`。
+4. 添加你的 `WeRead Link Notion` integration。
+5. 回到 GitHub Actions 重新运行。
 
-1. 打开 Notion 页面。
-2. 点右上角 Share 或 `...`。
-3. 邀请你的 integration。
-4. 重新运行 Actions。
+如果仍然失败：
 
-## WeRead 网络错误
-
-如果日志里出现：
-
-```text
-Network is unreachable
-```
-
-新版默认会强制微信读书网关走 IPv4，通常可以绕开 GitHub runner 的 IPv6 路由问题。
-
-如果仍然失败，手动重新运行一次。GitHub runner 区域偶尔会影响到微信读书域名连接。
+- 确认 `NOTION_TOKEN` 来自同一个 Notion workspace。
+- 确认 `NOTION_PAGE` 是普通页面链接，不是数据库链接。
+- 确认你没有把页面移到另一个未授权的 workspace。
 
 ## 热力图没有显示
 
-先看仓库里有没有文件：
+先看仓库里有没有生成文件：
 
 ```text
 assets/heatmap.png
@@ -57,25 +103,47 @@ assets/heatmap.svg
 assets/heatmap.json
 ```
 
-如果没有，说明 `Generate heatmap` 或 `Publish heatmap assets` 步骤失败。
+### 仓库里没有这些文件
 
-如果有，但 Notion 没显示：
+说明 `Generate heatmap` 或 `Publish heatmap assets` 失败。
 
-1. 确认 `Sync Notion` 步骤成功。
-2. 刷新 Notion 页面。
-3. 检查 `同步快照` 里最新记录的 `Heatmap` 字段。
+检查：
 
-## 笔记同步很慢
+1. GitHub Actions 日志里 `Generate heatmap` 是否成功。
+2. 仓库 `Settings -> Actions -> General` 里，Workflow permissions 是否允许写入。
+3. `.github/workflows/sync.yml` 里是否有：
 
-笔记同步需要逐本书拉取划线和想法。第一次运行慢是正常的。
+```yaml
+permissions:
+  contents: write
+```
 
-可以先设置 GitHub Variable：
+### 仓库里有文件，但 Notion 没显示
+
+检查：
+
+1. `Sync Notion` 步骤是否成功。
+2. Notion 页面是否刷新过。
+3. `同步快照` 数据库里最新记录的 `Heatmap` 字段是否有链接。
+4. 仓库如果是私有仓库，Notion 可能无法稳定加载 raw 图片链接。此时仍可以查看 `每日阅读` 数据库，热力图文件也会保留在 GitHub 仓库里。
+
+## Actions 跑了很久
+
+第一次同步笔记可能比较慢，因为要逐本书读取划线和想法。
+
+可以先限制笔记数量：
 
 ```text
 MAX_NOTEBOOKS=5
 ```
 
-确认流程跑通后再改回：
+路径：
+
+```text
+Settings -> Secrets and variables -> Actions -> Variables
+```
+
+确认流程跑通以后，再改回：
 
 ```text
 MAX_NOTEBOOKS=0
@@ -83,10 +151,46 @@ MAX_NOTEBOOKS=0
 
 ## 不想同步笔记
 
-设置 GitHub Variable：
+添加 GitHub Variable：
 
 ```text
 SYNC_NOTES=false
 ```
 
 这样只同步书库、每日阅读和热力图。
+
+## GitHub 自动提交热力图失败
+
+如果 `Publish heatmap assets` 报权限错误，检查仓库设置：
+
+```text
+Settings -> Actions -> General -> Workflow permissions
+```
+
+选择：
+
+```text
+Read and write permissions
+```
+
+保存后重新运行 Actions。
+
+## Notion 页面重复创建内容
+
+正常情况下，同步器会尽量复用已经创建的数据库。
+
+如果你手动删除或重命名了数据库，下一次运行可能会重新创建。建议：
+
+1. 不要删除 `书库`、`笔记`、`每日阅读`、`同步快照`。
+2. 可以新增自己的视图、筛选、分组。
+3. 不建议修改关键字段名，例如 `Book ID`、`Note ID`、`Date`。
+
+## 仍然不知道哪里错了
+
+把 GitHub Actions 失败步骤截图，重点截这几处：
+
+1. 失败的步骤名。
+2. 红色报错信息。
+3. 报错前后 20 行日志。
+
+不要截图或公开显示任何 secret 明文。
