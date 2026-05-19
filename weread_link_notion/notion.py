@@ -24,6 +24,13 @@ NOTES_DB = "笔记"
 DAILY_DB = "每日阅读"
 RUNS_DB = "同步快照"
 
+REQUIRED_PROPERTIES = {
+    BOOKS_DB: ("书名", "Book ID"),
+    NOTES_DB: ("内容", "Note ID"),
+    DAILY_DB: ("日期",),
+    RUNS_DB: ("同步时间",),
+}
+
 
 class NotionStore:
     def __init__(self, token, page):
@@ -59,7 +66,12 @@ class NotionStore:
         for block in self._walk_blocks(self.page_id):
             if block.get("type") == "child_database":
                 title_text = block["child_database"]["title"]
-                self.databases[title_text] = self._queryable_database_id(block["id"])
+                required = REQUIRED_PROPERTIES.get(title_text)
+                if not required:
+                    continue
+                queryable_id = self._queryable_database_id(block["id"])
+                if self._database_has_properties(queryable_id, required):
+                    self.databases[title_text] = queryable_id
 
     def _walk_blocks(self, block_id):
         for block in self._children(block_id):
@@ -105,6 +117,8 @@ class NotionStore:
                     properties=schema,
                 )
                 self.databases[name] = self._queryable_database_id_from_response(response)
+            else:
+                self._ensure_database_properties(self.databases[name], schema)
 
     def upsert_book(self, book):
         props = {
@@ -238,6 +252,33 @@ class NotionStore:
         if data_sources:
             return data_sources[0].get("id") or response["id"]
         return response["id"]
+
+    def _database_properties(self, database_id):
+        if self._uses_data_sources():
+            response = self.client.data_sources.retrieve(data_source_id=database_id)
+        else:
+            response = self.client.databases.retrieve(database_id=database_id)
+        return response.get("properties") or {}
+
+    def _database_has_properties(self, database_id, property_names):
+        try:
+            properties = self._database_properties(database_id)
+        except Exception:  # noqa: BLE001 - stale or inaccessible child databases should be ignored.
+            return False
+        return all(name in properties for name in property_names)
+
+    def _ensure_database_properties(self, database_id, schema):
+        properties = self._database_properties(database_id)
+        missing = {
+            name: definition
+            for name, definition in schema.items()
+            if name not in properties and "title" not in definition
+        }
+        if not missing:
+            return None
+        if self._uses_data_sources():
+            return self.client.data_sources.update(data_source_id=database_id, properties=missing)
+        return self.client.databases.update(database_id=database_id, properties=missing)
 
 
 def _books_schema():
