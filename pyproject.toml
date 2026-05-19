@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weread-link-notion"
+version = "1.0.0"
+description = "Sync WeRead books, notes, reading time, and heatmap to Notion with a WeRead API key."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "notion-client>=2.4.0",
+  "Pillow>=10.0.0",
+  "python-dotenv>=1.0.0",
+  "requests>=2.31.0",
+]
+
+[project.scripts]
+weread-link-notion = "weread_link_notion.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["weread_link_notion*"]
