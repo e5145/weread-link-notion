@@ -10,7 +10,7 @@ def short_text(value, limit=1900):
     text = "" if value is None else str(value)
     if len(text) <= limit:
         return text
-    return text[: limit - 1] + "…"
+    return text[: limit - 3] + "..."
 
 
 def timestamp_to_dt(value):
@@ -23,17 +23,17 @@ def timestamp_to_dt(value):
 
 
 def date_iso_from_timestamp(value):
-    date = timestamp_to_dt(value)
-    if not date:
+    date_value = timestamp_to_dt(value)
+    if not date_value:
         return None
-    return date.date().isoformat()
+    return date_value.date().isoformat()
 
 
 def datetime_iso_from_timestamp(value):
-    date = timestamp_to_dt(value)
-    if not date:
+    date_value = timestamp_to_dt(value)
+    if not date_value:
         return None
-    return date.isoformat()
+    return date_value.isoformat()
 
 
 def seconds_to_minutes(seconds):
