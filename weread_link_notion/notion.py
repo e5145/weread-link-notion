@@ -175,7 +175,7 @@ class NotionStore:
             if block_type == "image":
                 return self.client.blocks.update(
                     block_id=block["id"],
-                    image=_image_payload(heatmap_url)["image"],
+                    image=_image_content(heatmap_url),
                 )
             if block_type == "embed":
                 parent = block.get("parent") or {}
@@ -326,11 +326,14 @@ def _image_payload(heatmap_url):
     return {
         "object": "block",
         "type": "image",
-        "image": {
-            "type": "external",
-            "external": {"url": heatmap_url},
-            "caption": _rt(HEATMAP_MARKER),
-        },
+        "image": _image_content(heatmap_url),
+    }
+
+
+def _image_content(heatmap_url):
+    return {
+        "external": {"url": heatmap_url},
+        "caption": _rt(HEATMAP_MARKER),
     }
 
 
