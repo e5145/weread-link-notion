@@ -60,10 +60,15 @@ def run_sync(config):
     note_count = 0
     if config.sync_notes:
         limited = notebooks[: config.max_notebooks] if config.max_notebooks > 0 else notebooks
-        for notebook in limited:
+        print(f"Syncing notes from {len(limited)} notebooks...")
+        for index, notebook in enumerate(limited, start=1):
             for note in iter_notes_for_notebook(client, notebook):
                 store.upsert_note(note)
                 note_count += 1
+                if note_count % 100 == 0:
+                    print(f"Synced {note_count} notes...")
+            if index % 10 == 0:
+                print(f"Processed {index}/{len(limited)} notebooks.")
 
     counts = {
         "books": book_count,
