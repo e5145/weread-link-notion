@@ -37,6 +37,9 @@ class NotionStore:
         self._ensure_databases()
         return self.databases
 
+    def _uses_data_sources(self):
+        return hasattr(self.client, "data_sources")
+
     def _children(self, block_id):
         results = []
         cursor = None
@@ -55,7 +58,8 @@ class NotionStore:
         self.databases = {}
         for block in self._walk_blocks(self.page_id):
             if block.get("type") == "child_database":
-                self.databases[block["child_database"]["title"]] = block["id"]
+                title_text = block["child_database"]["title"]
+                self.databases[title_text] = self._queryable_database_id(block["id"])
 
     def _walk_blocks(self, block_id):
         for block in self._children(block_id):
@@ -65,20 +69,24 @@ class NotionStore:
 
     def _ensure_dashboard(self, heatmap_url):
         has_marker = False
+        has_clean_intro = False
+        has_clean_heatmap_heading = False
         for block in self._children(self.page_id):
             text = _plain_text_from_block(block)
-            if DASHBOARD_MARKER in text:
-                has_marker = True
-                break
+            has_marker = has_marker or DASHBOARD_MARKER in text
+            has_clean_intro = has_clean_intro or "微信读书同步面板" in text
+            has_clean_heatmap_heading = has_clean_heatmap_heading or "阅读热力图" in text
+
+        children = []
         if not has_marker:
-            self.client.blocks.children.append(
-                block_id=self.page_id,
-                children=[
-                    _heading_1("WeRead Link Notion"),
-                    _callout("一个轻量的微信读书同步面板：热力图、书库、笔记、每日阅读和同步快照会在这里自动维护。"),
-                    _heading_2("阅读热力图"),
-                ],
-            )
+            children.append(_heading_1("WeRead Link Notion"))
+        if not has_clean_intro:
+            children.append(_callout("一个轻量的微信读书同步面板：热力图、书库、笔记、每日阅读和同步快照会在这里自动维护。"))
+        if not has_clean_heatmap_heading:
+            children.append(_heading_2("阅读热力图"))
+
+        if children:
+            self.client.blocks.children.append(block_id=self.page_id, children=children)
         if heatmap_url:
             self.update_heatmap(heatmap_url)
 
@@ -96,7 +104,7 @@ class NotionStore:
                     title=[{"type": "text", "text": {"content": name}}],
                     properties=schema,
                 )
-                self.databases[name] = response["id"]
+                self.databases[name] = self._queryable_database_id_from_response(response)
 
     def upsert_book(self, book):
         props = {
@@ -158,7 +166,7 @@ class NotionStore:
             "Heatmap": url(heatmap_url),
             "Message": rich_text(message),
         }
-        return self.client.pages.create(parent={"database_id": self.databases[RUNS_DB]}, properties=props)
+        return self.client.pages.create(parent=self._database_parent(self.databases[RUNS_DB]), properties=props)
 
     def update_heatmap(self, heatmap_url):
         block = self._find_heatmap_block()
@@ -201,11 +209,35 @@ class NotionStore:
             filter_value = {"property": key_property, "title": {"equals": key}}
         else:
             filter_value = {"property": key_property, "rich_text": {"equals": key}}
-        response = self.client.databases.query(database_id=database_id, filter=filter_value, page_size=1)
+        response = self._query_database(database_id, filter_value)
         results = response.get("results") or []
         if results:
             return self.client.pages.update(page_id=results[0]["id"], properties=properties)
-        return self.client.pages.create(parent={"database_id": database_id}, properties=properties)
+        return self.client.pages.create(parent=self._database_parent(database_id), properties=properties)
+
+    def _query_database(self, database_id, filter_value):
+        if self._uses_data_sources():
+            return self.client.data_sources.query(data_source_id=database_id, filter=filter_value, page_size=1)
+        return self.client.databases.query(database_id=database_id, filter=filter_value, page_size=1)
+
+    def _database_parent(self, database_id):
+        if self._uses_data_sources():
+            return {"type": "data_source_id", "data_source_id": database_id}
+        return {"database_id": database_id}
+
+    def _queryable_database_id(self, database_id):
+        if not self._uses_data_sources():
+            return database_id
+        response = self.client.databases.retrieve(database_id=database_id)
+        return self._queryable_database_id_from_response(response) or database_id
+
+    def _queryable_database_id_from_response(self, response):
+        if not self._uses_data_sources():
+            return response["id"]
+        data_sources = response.get("data_sources") or []
+        if data_sources:
+            return data_sources[0].get("id") or response["id"]
+        return response["id"]
 
 
 def _books_schema():
@@ -282,15 +314,11 @@ def _heading_2(text):
     return {"object": "block", "type": "heading_2", "heading_2": {"rich_text": _rt(text)}}
 
 
-def _paragraph(text):
-    return {"object": "block", "type": "paragraph", "paragraph": {"rich_text": _rt(text)}}
-
-
 def _callout(text):
     return {
         "object": "block",
         "type": "callout",
-        "callout": {"rich_text": _rt(text), "icon": {"type": "emoji", "emoji": "📖"}},
+        "callout": {"rich_text": _rt(text), "icon": {"type": "emoji", "emoji": "📚"}},
     }
 
 
