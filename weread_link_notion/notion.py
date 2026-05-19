@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
+import time
 
 from notion_client import Client
+from notion_client.errors import APIResponseError, RequestTimeoutError
 
 from .utils import (
     checkbox,
@@ -34,7 +36,7 @@ REQUIRED_PROPERTIES = {
 
 class NotionStore:
     def __init__(self, token, page):
-        self.client = Client(auth=token)
+        self.client = Client(auth=token, timeout_ms=90000)
         self.page_id = extract_notion_page_id(page)
         self.databases = {}
 
@@ -54,7 +56,7 @@ class NotionStore:
             kwargs = {"block_id": block_id, "page_size": 100}
             if cursor:
                 kwargs["start_cursor"] = cursor
-            response = self.client.blocks.children.list(**kwargs)
+            response = self._notion(self.client.blocks.children.list, **kwargs)
             results.extend(response.get("results") or [])
             if not response.get("has_more"):
                 break
@@ -98,7 +100,7 @@ class NotionStore:
             children.append(_heading_2("阅读热力图"))
 
         if children:
-            self.client.blocks.children.append(block_id=self.page_id, children=children)
+            self._notion(self.client.blocks.children.append, block_id=self.page_id, children=children)
         if heatmap_url:
             self.update_heatmap(heatmap_url)
 
@@ -119,7 +121,7 @@ class NotionStore:
                     kwargs["initial_data_source"] = {"properties": schema}
                 else:
                     kwargs["properties"] = schema
-                response = self.client.databases.create(**kwargs)
+                response = self._notion(self.client.databases.create, **kwargs)
                 self.databases[name] = self._queryable_database_id_from_response(response)
             else:
                 self._ensure_database_properties(self.databases[name], schema)
@@ -184,14 +186,15 @@ class NotionStore:
             "Heatmap": url(heatmap_url),
             "Message": rich_text(message),
         }
-        return self.client.pages.create(parent=self._database_parent(self.databases[RUNS_DB]), properties=props)
+        return self._notion(self.client.pages.create, parent=self._database_parent(self.databases[RUNS_DB]), properties=props)
 
     def update_heatmap(self, heatmap_url):
         block = self._find_heatmap_block()
         if block:
             block_type = block.get("type")
             if block_type == "image":
-                return self.client.blocks.update(
+                return self._notion(
+                    self.client.blocks.update,
                     block_id=block["id"],
                     image=_image_content(heatmap_url),
                 )
@@ -199,14 +202,15 @@ class NotionStore:
                 parent = block.get("parent") or {}
                 parent_id = parent.get("page_id") or parent.get("block_id")
                 if parent_id:
-                    response = self.client.blocks.children.append(
+                    response = self._notion(
+                        self.client.blocks.children.append,
                         block_id=parent_id,
                         after=block["id"],
                         children=[_image_payload(heatmap_url)],
                     )
-                    self.client.blocks.delete(block_id=block["id"])
+                    self._notion(self.client.blocks.delete, block_id=block["id"])
                     return response
-        return self.client.blocks.children.append(block_id=self.page_id, children=[_image_payload(heatmap_url)])
+        return self._notion(self.client.blocks.children.append, block_id=self.page_id, children=[_image_payload(heatmap_url)])
 
     def _find_heatmap_block(self):
         for block in self._walk_blocks(self.page_id):
@@ -230,13 +234,13 @@ class NotionStore:
         response = self._query_database(database_id, filter_value)
         results = response.get("results") or []
         if results:
-            return self.client.pages.update(page_id=results[0]["id"], properties=properties)
-        return self.client.pages.create(parent=self._database_parent(database_id), properties=properties)
+            return self._notion(self.client.pages.update, page_id=results[0]["id"], properties=properties)
+        return self._notion(self.client.pages.create, parent=self._database_parent(database_id), properties=properties)
 
     def _query_database(self, database_id, filter_value):
         if self._uses_data_sources():
-            return self.client.data_sources.query(data_source_id=database_id, filter=filter_value, page_size=1)
-        return self.client.databases.query(database_id=database_id, filter=filter_value, page_size=1)
+            return self._notion(self.client.data_sources.query, data_source_id=database_id, filter=filter_value, page_size=1)
+        return self._notion(self.client.databases.query, database_id=database_id, filter=filter_value, page_size=1)
 
     def _database_parent(self, database_id):
         if self._uses_data_sources():
@@ -246,7 +250,7 @@ class NotionStore:
     def _queryable_database_id(self, database_id):
         if not self._uses_data_sources():
             return database_id
-        response = self.client.databases.retrieve(database_id=database_id)
+        response = self._notion(self.client.databases.retrieve, database_id=database_id)
         return self._queryable_database_id_from_response(response) or database_id
 
     def _queryable_database_id_from_response(self, response):
@@ -259,9 +263,9 @@ class NotionStore:
 
     def _database_properties(self, database_id):
         if self._uses_data_sources():
-            response = self.client.data_sources.retrieve(data_source_id=database_id)
+            response = self._notion(self.client.data_sources.retrieve, data_source_id=database_id)
         else:
-            response = self.client.databases.retrieve(database_id=database_id)
+            response = self._notion(self.client.databases.retrieve, database_id=database_id)
         return response.get("properties") or {}
 
     def _database_has_properties(self, database_id, property_names):
@@ -281,8 +285,24 @@ class NotionStore:
         if not missing:
             return None
         if self._uses_data_sources():
-            return self.client.data_sources.update(data_source_id=database_id, properties=missing)
-        return self.client.databases.update(database_id=database_id, properties=missing)
+            return self._notion(self.client.data_sources.update, data_source_id=database_id, properties=missing)
+        return self._notion(self.client.databases.update, database_id=database_id, properties=missing)
+
+    def _notion(self, func, **kwargs):
+        last_error = None
+        for attempt in range(4):
+            try:
+                return func(**kwargs)
+            except RequestTimeoutError as exc:
+                last_error = exc
+            except APIResponseError as exc:
+                code = getattr(getattr(exc, "code", ""), "value", getattr(exc, "code", ""))
+                if code not in ("rate_limited", "internal_server_error", "service_unavailable"):
+                    raise
+                last_error = exc
+            if attempt < 3:
+                time.sleep(2 * (attempt + 1))
+        raise last_error
 
 
 def _books_schema():
