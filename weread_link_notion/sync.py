@@ -1,7 +1,6 @@
 from datetime import datetime
 from pathlib import Path
 
-from .config import Config
 from .heatmap import bucket_to_date, generate_heatmap
 from .notion import NotionStore
 from .utils import (
@@ -115,7 +114,9 @@ def normalize_books(shelf, notebooks):
                 "category": item.get("category"),
                 "status": "读完" if finish else ("在读" if last_read else "未读"),
                 "progress": 1 if finish else None,
-                "reading_minutes": seconds_to_minutes(progress.get("readingTime") or item.get("readingTime") or item.get("recordReadingTime")),
+                "reading_minutes": seconds_to_minutes(
+                    progress.get("readingTime") or item.get("readingTime") or item.get("recordReadingTime")
+                ),
                 "last_read": date_iso_from_timestamp(last_read),
                 "secret": int(item.get("secret") or 0) == 1,
                 "cover": item.get("cover"),
