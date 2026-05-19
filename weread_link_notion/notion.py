@@ -111,11 +111,15 @@ class NotionStore:
         }
         for name, schema in specs.items():
             if name not in self.databases:
-                response = self.client.databases.create(
-                    parent={"type": "page_id", "page_id": self.page_id},
-                    title=[{"type": "text", "text": {"content": name}}],
-                    properties=schema,
-                )
+                kwargs = {
+                    "parent": {"type": "page_id", "page_id": self.page_id},
+                    "title": [{"type": "text", "text": {"content": name}}],
+                }
+                if self._uses_data_sources():
+                    kwargs["initial_data_source"] = {"properties": schema}
+                else:
+                    kwargs["properties"] = schema
+                response = self.client.databases.create(**kwargs)
                 self.databases[name] = self._queryable_database_id_from_response(response)
             else:
                 self._ensure_database_properties(self.databases[name], schema)
