@@ -29,8 +29,8 @@ def generate_heatmap_assets(config, year=None):
     svg_path = str(Path(config.heatmap_path).with_suffix(".svg"))
     metadata_path = str(Path(config.heatmap_path).with_suffix(".json"))
     metadata = generate_heatmap(read_times, year, png_path, svg_path=svg_path, metadata_path=metadata_path)
-    print(f"Generated heatmap: {png_path}")
-    print(f"Total: {metadata['total']}; active days: {metadata['active_days']}")
+    print(f"Generated heatmap: {png_path}", flush=True)
+    print(f"Total: {metadata['total']}; active days: {metadata['active_days']}", flush=True)
     return metadata
 
 
@@ -60,15 +60,15 @@ def run_sync(config):
     note_count = 0
     if config.sync_notes:
         limited = notebooks[: config.max_notebooks] if config.max_notebooks > 0 else notebooks
-        print(f"Syncing notes from {len(limited)} notebooks...")
+        print(f"Syncing notes from {len(limited)} notebooks...", flush=True)
         for index, notebook in enumerate(limited, start=1):
             for note in iter_notes_for_notebook(client, notebook):
                 store.upsert_note(note)
                 note_count += 1
                 if note_count % 100 == 0:
-                    print(f"Synced {note_count} notes...")
+                    print(f"Synced {note_count} notes...", flush=True)
             if index % 10 == 0:
-                print(f"Processed {index}/{len(limited)} notebooks.")
+                print(f"Processed {index}/{len(limited)} notebooks.", flush=True)
 
     counts = {
         "books": book_count,
@@ -77,7 +77,7 @@ def run_sync(config):
         "read_minutes": round(read_seconds / 60, 2),
     }
     store.create_sync_run("success", counts, config.heatmap_url, "Sync completed.")
-    print(f"Synced {book_count} books, {note_count} notes, {daily_count} reading days.")
+    print(f"Synced {book_count} books, {note_count} notes, {daily_count} reading days.", flush=True)
     return counts
 
 
