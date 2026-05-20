@@ -19,6 +19,8 @@ from .utils import (
 
 DASHBOARD_MARKER = "WeRead Link Notion"
 HEATMAP_MARKER = "WeRead Link Notion heatmap"
+PROFILE_MARKER = "WeRead Link Notion reading profile"
+MONTHLY_CHART_MARKER = "WeRead Link Notion monthly reading chart"
 DASHBOARD_SNAPSHOT_PREFIX = "最近同步 ·"
 DASHBOARD_TITLE_PREFIX = "微信读书阅读面板 ·"
 
@@ -26,12 +28,14 @@ DASHBOARD_TITLE_PREFIX = "微信读书阅读面板 ·"
 BOOKS_DB = "书库"
 NOTES_DB = "笔记"
 DAILY_DB = "每日阅读"
+RECOMMENDATIONS_DB = "推荐好书"
 RUNS_DB = "同步快照"
 
 REQUIRED_PROPERTIES = {
     BOOKS_DB: ("书名", "Book ID"),
     NOTES_DB: ("内容", "Note ID"),
     DAILY_DB: ("日期",),
+    RECOMMENDATIONS_DB: ("书名", "Book ID"),
     RUNS_DB: ("同步时间",),
 }
 
@@ -109,22 +113,46 @@ class NotionStore:
             if block.get("has_children") and block.get("type") != "child_database":
                 yield from self._walk_blocks(block["id"])
 
-    def rebuild_dashboard(self, counts, books, notes, daily_rows, heatmap_url=""):
+    def rebuild_dashboard(
+        self,
+        counts,
+        books,
+        notes,
+        daily_rows,
+        recommendations=None,
+        heatmap_url="",
+        profile_url="",
+        monthly_chart_url="",
+        dashboard_quote="看书真好",
+        streak_days=0,
+    ):
         now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
         anchor_id = self._find_managed_dashboard_anchor_id()
+        recommendations = recommendations or []
         children = [
+            _quote(dashboard_quote),
             _paragraph(
-                "自动同步已经完成。完整数据在下方 4 个数据库中，这里只保留最常看的摘要和最近内容。"
+                "首页只放高频信息：今年读了多久、哪些书最近在读、最近产生了哪些划线和想法。完整数据留在下方数据库，页面保持轻，不把 Notion 堆成流水账。"
             ),
+            _divider(),
+            _heading_3("年度概览"),
             _paragraph(
                 f"书库 {counts.get('books', 0)} 本  ·  "
                 f"笔记 {counts.get('notes', 0)} 条  ·  "
                 f"阅读日 {counts.get('read_days', 0)} 天  ·  "
+                f"连续阅读 {streak_days} 天  ·  "
                 f"今年 {counts.get('read_minutes', 0)} 分钟"
             ),
         ]
         if heatmap_url:
-            children.extend([_divider(), _image_payload(heatmap_url)])
+            children.extend(
+                [
+                    _divider(),
+                    _heading_3("阅读热力图"),
+                    _paragraph(f"连续阅读 {streak_days} 天。来自 assets/heatmap.png，每次同步自动刷新。"),
+                    _image_payload(heatmap_url, HEATMAP_MARKER),
+                ]
+            )
 
         children.extend(
             [
@@ -132,22 +160,59 @@ class NotionStore:
                 _heading_3("最近阅读"),
             ]
         )
-        for book in _recent_books(books):
+        for book in _recent_books(books, limit=5):
             children.append(_bulleted_list_item(_format_book_preview(book)))
         if children[-1].get("type") == "heading_3":
             children.append(_bulleted_list_item("暂时没有最近阅读书籍。"))
 
+        children.extend([_heading_3("当月阅读时长分布")])
+        if monthly_chart_url:
+            children.append(_image_payload(monthly_chart_url, MONTHLY_CHART_MARKER))
+        else:
+            for row in _recent_daily_rows(daily_rows, limit=5):
+                children.append(_bulleted_list_item(_format_daily_preview(row)))
+            if children[-1].get("type") == "heading_3":
+                children.append(_bulleted_list_item("暂时没有每日阅读数据。"))
+
         children.extend([_divider(), _heading_3("最近笔记")])
-        for note in _recent_notes(notes):
+        for note in _recent_thoughts(notes, limit=5):
             children.append(_bulleted_list_item(_format_note_preview(note)))
         if children[-1].get("type") == "heading_3":
-            children.append(_bulleted_list_item("暂时没有笔记。"))
+            children.append(_bulleted_list_item("暂时没有想法笔记。"))
 
-        children.extend([_divider(), _heading_3("最近阅读日")])
-        for row in _recent_daily_rows(daily_rows):
-            children.append(_bulleted_list_item(_format_daily_preview(row)))
+        children.extend([_heading_3("最近划线")])
+        for note in _recent_highlights(notes, limit=5):
+            children.append(_bulleted_list_item(_format_note_preview(note)))
         if children[-1].get("type") == "heading_3":
-            children.append(_bulleted_list_item("暂时没有每日阅读数据。"))
+            children.append(_bulleted_list_item("暂时没有划线。"))
+
+        children.extend([_divider(), _heading_3("推荐好书")])
+        for recommendation in recommendations[:6]:
+            children.append(_bulleted_list_item(_format_recommendation_preview(recommendation)))
+        if children[-1].get("type") == "heading_3":
+            children.append(_bulleted_list_item("暂时没有拿到推荐书籍，下次同步会继续尝试。"))
+
+        if profile_url:
+            children.extend(
+                [
+                    _divider(),
+                    _heading_3("阅读画像"),
+                    _paragraph("偏好分类、阅读时段、书籍分布、点评分布、偏好作者和版权方会被生成到 assets/reading-profile.png。"),
+                    _image_payload(profile_url, PROFILE_MARKER),
+                ]
+            )
+
+        children.extend(
+            [
+                _divider(),
+                _heading_3("数据与能力入口"),
+                _bulleted_list_item("推荐好书：来自 weread.skill 的个性化推荐接口，每次同步自动更新。"),
+                _bulleted_list_item("书库：保存书架、阅读状态、最近阅读、阅读时长和微信读书链接。"),
+                _bulleted_list_item("笔记：保存划线和想法，按书名、类型、章节和创建时间筛选。"),
+                _bulleted_list_item("每日阅读：保存每天阅读时长，支撑热力图、日历和图表。"),
+                _bulleted_list_item("同步快照：记录每次运行状态、数量、热力图和画像链接，方便排错。"),
+            ]
+        )
 
         dashboard = _callout(
             f"{DASHBOARD_TITLE_PREFIX}{now}",
@@ -168,6 +233,7 @@ class NotionStore:
             BOOKS_DB: _books_schema(),
             NOTES_DB: _notes_schema(),
             DAILY_DB: _daily_schema(),
+            RECOMMENDATIONS_DB: _recommendations_schema(),
             RUNS_DB: _runs_schema(),
         }
         for name, schema in specs.items():
@@ -233,7 +299,24 @@ class NotionStore:
         }
         return self._upsert(self.databases[DAILY_DB], "日期", row["date"], props, title_key=True)
 
-    def create_sync_run(self, status, counts, heatmap_url="", message=""):
+    def upsert_recommendation(self, recommendation):
+        props = {
+            "书名": title(recommendation["title"]),
+            "Book ID": rich_text(recommendation["id"]),
+            "作者": rich_text(recommendation.get("author")),
+            "分类": rich_text(recommendation.get("category")),
+            "推荐理由": rich_text(recommendation.get("reason")),
+            "评分": number(recommendation.get("rating")),
+            "评分人数": number(recommendation.get("rating_count")),
+            "评分标签": rich_text(recommendation.get("rating_label")),
+            "在读人数": number(recommendation.get("reading_count")),
+            "封面": url(recommendation.get("cover")),
+            "微信读书链接": url(recommendation.get("weread_url")),
+            "排序": number(recommendation.get("sort")),
+        }
+        return self._upsert(self.databases[RECOMMENDATIONS_DB], "Book ID", recommendation["id"], props)
+
+    def create_sync_run(self, status, counts, heatmap_url="", profile_url="", monthly_chart_url="", message=""):
         now = datetime.now(timezone.utc).astimezone().isoformat()
         props = {
             "同步时间": title(now),
@@ -242,7 +325,11 @@ class NotionStore:
             "Notes": number(counts.get("notes")),
             "Read Days": number(counts.get("read_days")),
             "Read Minutes": number(counts.get("read_minutes")),
+            "Recommendations": number(counts.get("recommendations")),
+            "Streak Days": number(counts.get("streak_days")),
             "Heatmap": url(heatmap_url),
+            "Reading Profile": url(profile_url),
+            "Monthly Chart": url(monthly_chart_url),
             "Message": rich_text(message),
         }
         return self._notion(self.client.pages.create, parent=self._database_parent(self.databases[RUNS_DB]), properties=props)
@@ -255,7 +342,7 @@ class NotionStore:
                 return self._notion(
                     self.client.blocks.update,
                     block_id=block["id"],
-                    image=_image_content(heatmap_url),
+                    image=_image_content(heatmap_url, HEATMAP_MARKER),
                 )
             if block_type == "embed":
                 parent = block.get("parent") or {}
@@ -265,11 +352,15 @@ class NotionStore:
                         self.client.blocks.children.append,
                         block_id=parent_id,
                         after=block["id"],
-                        children=[_image_payload(heatmap_url)],
+                        children=[_image_payload(heatmap_url, HEATMAP_MARKER)],
                     )
                     self._notion(self.client.blocks.delete, block_id=block["id"])
                     return response
-        return self._notion(self.client.blocks.children.append, block_id=self.page_id, children=[_image_payload(heatmap_url)])
+        return self._notion(
+            self.client.blocks.children.append,
+            block_id=self.page_id,
+            children=[_image_payload(heatmap_url, HEATMAP_MARKER)],
+        )
 
     def _find_heatmap_block(self):
         for block in self._walk_blocks(self.page_id):
@@ -310,13 +401,21 @@ class NotionStore:
         if "微信读书同步面板" in text or text == "阅读热力图":
             return True
         if block.get("type") == "image":
-            return self._is_managed_heatmap_block(block)
+            return self._is_managed_asset_block(block)
         return False
 
-    def _is_managed_heatmap_block(self, block):
+    def _is_managed_asset_block(self, block):
         caption = _plain_text(block.get("image", {}).get("caption") or [])
         external = block.get("image", {}).get("external") or {}
-        return HEATMAP_MARKER in caption or "/assets/heatmap" in (external.get("url") or "")
+        asset_url = external.get("url") or ""
+        return (
+            HEATMAP_MARKER in caption
+            or PROFILE_MARKER in caption
+            or MONTHLY_CHART_MARKER in caption
+            or "/assets/heatmap" in asset_url
+            or "/assets/reading-profile" in asset_url
+            or "/assets/monthly-reading" in asset_url
+        )
 
     def _upsert(self, database_id, key_property, key, properties, title_key=False, update_existing=True):
         cache_key = (database_id, key_property, "title" if title_key else "rich_text")
@@ -491,6 +590,23 @@ def _daily_schema():
     }
 
 
+def _recommendations_schema():
+    return {
+        "书名": {"title": {}},
+        "Book ID": {"rich_text": {}},
+        "作者": {"rich_text": {}},
+        "分类": {"rich_text": {}},
+        "推荐理由": {"rich_text": {}},
+        "评分": {"number": {"format": "number"}},
+        "评分人数": {"number": {"format": "number"}},
+        "评分标签": {"rich_text": {}},
+        "在读人数": {"number": {"format": "number"}},
+        "封面": {"url": {}},
+        "微信读书链接": {"url": {}},
+        "排序": {"number": {"format": "number"}},
+    }
+
+
 def _runs_schema():
     return {
         "同步时间": {"title": {}},
@@ -499,7 +615,11 @@ def _runs_schema():
         "Notes": {"number": {"format": "number"}},
         "Read Days": {"number": {"format": "number"}},
         "Read Minutes": {"number": {"format": "number"}},
+        "Recommendations": {"number": {"format": "number"}},
+        "Streak Days": {"number": {"format": "number"}},
         "Heatmap": {"url": {}},
+        "Reading Profile": {"url": {}},
+        "Monthly Chart": {"url": {}},
         "Message": {"rich_text": {}},
     }
 
@@ -559,18 +679,18 @@ def _callout(text, icon="📚", color="default", children=None):
     }
 
 
-def _image_payload(heatmap_url):
+def _image_payload(image_url, caption):
     return {
         "object": "block",
         "type": "image",
-        "image": _image_content(heatmap_url),
+        "image": _image_content(image_url, caption),
     }
 
 
-def _image_content(heatmap_url):
+def _image_content(image_url, caption):
     return {
-        "external": {"url": heatmap_url},
-        "caption": _rt(HEATMAP_MARKER),
+        "external": {"url": image_url},
+        "caption": _rt(caption),
     }
 
 
@@ -610,6 +730,14 @@ def _recent_notes(notes, limit=10):
     return sorted(notes, key=lambda note: note.get("created_at") or "", reverse=True)[:limit]
 
 
+def _recent_thoughts(notes, limit=5):
+    return [note for note in _recent_notes(notes, limit=100) if note.get("type") == "想法"][:limit]
+
+
+def _recent_highlights(notes, limit=5):
+    return [note for note in _recent_notes(notes, limit=100) if note.get("type") == "划线"][:limit]
+
+
 def _recent_daily_rows(rows, limit=7):
     return sorted(rows, key=lambda row: row.get("date") or "", reverse=True)[:limit]
 
@@ -636,3 +764,16 @@ def _format_note_preview(note):
 def _format_daily_preview(row):
     minutes = round((row.get("seconds") or 0) / 60, 2)
     return f"{row.get('date')} · {minutes} 分钟"
+
+
+def _format_recommendation_preview(recommendation):
+    parts = [f"《{recommendation.get('title') or '未命名'}》"]
+    if recommendation.get("author"):
+        parts.append(str(recommendation["author"]))
+    if recommendation.get("rating"):
+        parts.append(f"{recommendation['rating']} 分")
+    if recommendation.get("reason"):
+        parts.append(str(recommendation["reason"]))
+    elif recommendation.get("category"):
+        parts.append(str(recommendation["category"]))
+    return " · ".join(parts)

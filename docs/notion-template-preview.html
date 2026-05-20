@@ -1,0 +1,1152 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WeRead Link Notion Template Preview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f7f7f4;
+      --panel: #ffffff;
+      --ink: #232522;
+      --muted: #6d706a;
+      --line: #dfddd5;
+      --line-strong: #c9c5b8;
+      --green: #2f7d51;
+      --green-soft: #e7f2ea;
+      --blue: #426f8f;
+      --blue-soft: #e8f0f5;
+      --amber: #9a6a22;
+      --amber-soft: #f4ead8;
+      --rose: #9b4d45;
+      --rose-soft: #f4e7e5;
+      --shadow: 0 16px 38px rgba(38, 35, 28, 0.08);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: var(--page);
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.7) 0, rgba(247,247,244,0) 360px),
+        var(--page);
+      font-family:
+        ui-sans-serif,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "Microsoft YaHei",
+        "PingFang SC",
+        sans-serif;
+      line-height: 1.55;
+      letter-spacing: 0;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .page {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 34px 0 56px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      display: grid;
+      place-items: center;
+      background: var(--panel);
+      color: var(--green);
+      font-weight: 700;
+      box-shadow: 0 8px 20px rgba(60, 55, 45, 0.06);
+      flex: 0 0 auto;
+    }
+
+    .brand-title {
+      font-size: 14px;
+      font-weight: 650;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand-subtitle {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sync-pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--muted);
+      padding: 7px 12px;
+      font-size: 12px;
+      white-space: nowrap;
+      box-shadow: 0 8px 20px rgba(60, 55, 45, 0.05);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+
+    .hero-main {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 28px;
+      min-height: 230px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .eyebrow {
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 40px;
+      line-height: 1.12;
+      letter-spacing: 0;
+      font-weight: 760;
+    }
+
+    .custom-quote {
+      max-width: 620px;
+      margin: 18px 0 0;
+      border-left: 3px solid var(--green);
+      padding: 10px 0 10px 14px;
+      color: #343832;
+      font-size: 18px;
+      font-weight: 680;
+      background: linear-gradient(90deg, rgba(47,125,81,0.08), rgba(47,125,81,0));
+    }
+
+    .quote-note {
+      max-width: 620px;
+      color: var(--muted);
+      margin: 8px 0 0;
+      font-size: 13px;
+    }
+
+    .quick-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 24px;
+    }
+
+    .quick-link {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 11px;
+      font-size: 13px;
+      color: #3b3d39;
+      background: #fbfbf9;
+    }
+
+    .hero-side {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+      min-height: 108px;
+      box-shadow: 0 12px 26px rgba(45, 42, 34, 0.06);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .metric:nth-child(1) {
+      background: var(--green-soft);
+    }
+
+    .metric:nth-child(2) {
+      background: var(--blue-soft);
+    }
+
+    .metric:nth-child(3) {
+      background: var(--amber-soft);
+    }
+
+    .metric:nth-child(4) {
+      background: var(--rose-soft);
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .metric-value {
+      font-size: 28px;
+      line-height: 1;
+      font-weight: 760;
+      margin-top: 18px;
+    }
+
+    .metric-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 12px 28px rgba(45, 42, 34, 0.05);
+      padding: 22px;
+      margin-bottom: 18px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: end;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 21px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .section-note {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .heatmap-shell {
+      border: 1px solid var(--line);
+      background: #fcfcfb;
+      border-radius: 7px;
+      overflow: hidden;
+      padding: 14px;
+    }
+
+    .heatmap-shell img {
+      display: block;
+      width: 100%;
+      min-height: 118px;
+      object-fit: contain;
+      background: #fff;
+      border-radius: 5px;
+    }
+
+    .heatmap-fallback {
+      display: none;
+      grid-template-columns: repeat(30, 1fr);
+      gap: 4px;
+      min-height: 136px;
+      align-content: center;
+    }
+
+    .heatmap-cell {
+      aspect-ratio: 1;
+      border-radius: 3px;
+      background: #e8e8e2;
+    }
+
+    .heatmap-cell.level-1 {
+      background: #cfe7d2;
+    }
+
+    .heatmap-cell.level-2 {
+      background: #98cf9e;
+    }
+
+    .heatmap-cell.level-3 {
+      background: #5ba86c;
+    }
+
+    .heatmap-cell.level-4 {
+      background: #25713f;
+    }
+
+    .grid-two {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .panel-title h2 {
+      font-size: 18px;
+    }
+
+    .view-tag {
+      border: 1px solid var(--line);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      background: #fbfbf9;
+      white-space: nowrap;
+    }
+
+    .book-list,
+    .note-list,
+    .daily-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .book-row,
+    .note-row,
+    .daily-row {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 12px;
+      background: #fbfbf9;
+    }
+
+    .book-row {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+    }
+
+    .cover {
+      width: 42px;
+      height: 56px;
+      border-radius: 5px;
+      background:
+        linear-gradient(140deg, rgba(47,125,81,0.86), rgba(66,111,143,0.72)),
+        #cfd8ce;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .book-name,
+    .note-book,
+    .daily-date {
+      font-weight: 680;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .book-meta,
+    .note-meta,
+    .daily-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    .progress {
+      height: 5px;
+      background: #e9e7df;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 9px;
+    }
+
+    .bar {
+      display: block;
+      height: 100%;
+      background: var(--green);
+      border-radius: inherit;
+    }
+
+    .note-text {
+      margin: 7px 0 0;
+      color: #3c3e39;
+      font-size: 13px;
+    }
+
+    .daily-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .daily-minutes {
+      font-size: 20px;
+      font-weight: 760;
+      color: var(--green);
+      white-space: nowrap;
+    }
+
+    .monthly-chart {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px 18px 16px;
+      background: #fbfbf9;
+    }
+
+    .monthly-plot {
+      position: relative;
+      height: 270px;
+      padding: 28px 48px 34px 0;
+    }
+
+    .monthly-grid {
+      position: absolute;
+      inset: 28px 48px 34px 0;
+      display: grid;
+      grid-template-rows: repeat(3, 1fr);
+      border-bottom: 1px dashed #dde1e2;
+    }
+
+    .monthly-grid span {
+      border-top: 1px dashed #dde1e2;
+    }
+
+    .monthly-bars {
+      position: absolute;
+      inset: 28px 68px 34px 0;
+      display: grid;
+      grid-template-columns: repeat(31, 1fr);
+      align-items: end;
+      gap: 6px;
+    }
+
+    .monthly-bar {
+      min-width: 4px;
+      border-radius: 999px 999px 3px 3px;
+      background: #35aeef;
+      box-shadow: 0 0 0 1px rgba(53, 174, 239, 0.08);
+    }
+
+    .monthly-y {
+      position: absolute;
+      top: 20px;
+      right: 0;
+      bottom: 25px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .monthly-x {
+      position: absolute;
+      left: 0;
+      right: 68px;
+      bottom: 0;
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .monthly-summary {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .database-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
+    }
+
+    .database-card {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 14px;
+      background: #fbfbf9;
+      min-height: 154px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .database-title {
+      font-size: 16px;
+      font-weight: 720;
+      margin-bottom: 8px;
+    }
+
+    .database-copy {
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0;
+    }
+
+    .database-fields {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 14px;
+    }
+
+    .field {
+      color: #565a52;
+      background: #efeee8;
+      border-radius: 999px;
+      padding: 4px 7px;
+      font-size: 11px;
+    }
+
+    .notion-map {
+      border-top: 1px solid var(--line);
+      margin-top: 18px;
+      padding-top: 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .notion-map strong {
+      color: var(--ink);
+    }
+
+    .insight-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .insight-card {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fbfbf9;
+      padding: 16px;
+      min-height: 244px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .insight-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+      margin-bottom: 12px;
+    }
+
+    .insight-title h3 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.25;
+    }
+
+    .insight-title span {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .radar-wrap,
+    .donut-wrap {
+      display: grid;
+      place-items: center;
+      min-height: 166px;
+    }
+
+    .bars {
+      display: flex;
+      align-items: end;
+      gap: 5px;
+      height: 150px;
+      padding: 14px 6px 8px;
+      border-left: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .time-bar {
+      flex: 1;
+      min-width: 4px;
+      border-radius: 999px 999px 3px 3px;
+      background: linear-gradient(180deg, #b56df0, #ff806a, #f2c25f);
+    }
+
+    .chart-axis {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 8px;
+    }
+
+    .donut-legend {
+      display: grid;
+      gap: 7px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 6px;
+      background: var(--green);
+    }
+
+    .word-cloud {
+      min-height: 166px;
+      display: flex;
+      flex-wrap: wrap;
+      align-content: center;
+      justify-content: center;
+      gap: 8px 12px;
+      color: #6ba9c8;
+      text-align: center;
+    }
+
+    .word-cloud span:nth-child(1) { font-size: 32px; font-weight: 760; color: #2d8fba; }
+    .word-cloud span:nth-child(2) { font-size: 25px; font-weight: 720; color: #3ba1cf; }
+    .word-cloud span:nth-child(3) { font-size: 21px; font-weight: 700; color: #58afd3; }
+    .word-cloud span:nth-child(4) { font-size: 18px; font-weight: 680; color: #74bbd6; }
+    .word-cloud span:nth-child(n+5) { font-size: 14px; color: #9acfe0; }
+
+    @media (max-width: 900px) {
+      .hero,
+      .grid-two,
+      .insight-grid,
+      .database-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-main {
+        min-height: auto;
+      }
+
+      h1 {
+        font-size: 32px;
+      }
+
+      .section-header {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      .section-note {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .page {
+        width: min(100% - 20px, 1120px);
+        padding-top: 18px;
+      }
+
+      .topbar {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      .hero-side {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 27px;
+      }
+
+      .hero-main,
+      .section {
+        padding: 16px;
+      }
+
+      .database-card {
+        min-height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">WR</div>
+        <div>
+          <div class="brand-title">WeRead Link Notion</div>
+          <div class="brand-subtitle">微信读书同步模板预览</div>
+        </div>
+      </div>
+      <div class="sync-pill">最近同步 2026-05-20 17:50</div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-main">
+        <div>
+          <div class="eyebrow">Reading Dashboard</div>
+          <h1>阅读总览</h1>
+          <div class="custom-quote">看书真好</div>
+          <p class="quote-note">
+            这里支持自定义句子，例如通过 `DASHBOARD_QUOTE` 填入你喜欢的话。首页保留高频信息，完整数据进入下方数据库。
+          </p>
+        </div>
+        <nav class="quick-links" aria-label="数据库入口">
+          <a class="quick-link" href="#books">书库</a>
+          <a class="quick-link" href="#notes">笔记</a>
+          <a class="quick-link" href="#daily">每日阅读</a>
+          <a class="quick-link" href="#insights">阅读画像</a>
+          <a class="quick-link" href="#databases">数据库</a>
+        </nav>
+      </div>
+
+      <aside class="hero-side" aria-label="同步摘要">
+        <article class="metric">
+          <div class="metric-label">书库</div>
+          <div>
+            <div class="metric-value">223</div>
+            <div class="metric-note">本书和文章收藏</div>
+          </div>
+        </article>
+        <article class="metric">
+          <div class="metric-label">笔记</div>
+          <div>
+            <div class="metric-value">1532</div>
+            <div class="metric-note">划线和想法</div>
+          </div>
+        </article>
+        <article class="metric">
+          <div class="metric-label">阅读日</div>
+          <div>
+            <div class="metric-value">88</div>
+            <div class="metric-note">今年有记录的天数</div>
+          </div>
+        </article>
+        <article class="metric">
+          <div class="metric-label">连续阅读</div>
+          <div>
+            <div class="metric-value">3</div>
+            <div class="metric-note">天 · 同步时自动计算</div>
+          </div>
+        </article>
+      </aside>
+    </section>
+
+    <section class="section" id="heatmap">
+      <div class="section-header">
+        <h2>阅读热力图</h2>
+        <div class="section-note">连续阅读 3 天 · 由每日阅读数据自动计算</div>
+      </div>
+      <div class="heatmap-shell">
+        <img
+          alt="WeRead 2026 阅读热力图"
+          src="https://raw.githubusercontent.com/e5145/weread-link-notion/main/assets/heatmap.png"
+          onerror="this.style.display='none';document.querySelector('.heatmap-fallback').style.display='grid';"
+        >
+        <div class="heatmap-fallback" aria-label="热力图占位">
+          <span class="heatmap-cell level-1"></span><span class="heatmap-cell level-2"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-3"></span><span class="heatmap-cell level-2"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-1"></span><span class="heatmap-cell level-4"></span><span class="heatmap-cell level-2"></span><span class="heatmap-cell"></span>
+          <span class="heatmap-cell"></span><span class="heatmap-cell level-1"></span><span class="heatmap-cell level-2"></span><span class="heatmap-cell level-2"></span><span class="heatmap-cell level-3"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-1"></span><span class="heatmap-cell level-4"></span><span class="heatmap-cell level-1"></span>
+          <span class="heatmap-cell level-2"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-1"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-2"></span><span class="heatmap-cell level-3"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span>
+          <span class="heatmap-cell"></span><span class="heatmap-cell level-2"></span><span class="heatmap-cell level-4"></span><span class="heatmap-cell level-3"></span><span class="heatmap-cell level-1"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-2"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-1"></span>
+          <span class="heatmap-cell level-1"></span><span class="heatmap-cell level-2"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-3"></span><span class="heatmap-cell level-2"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-4"></span><span class="heatmap-cell level-2"></span>
+          <span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-1"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-2"></span><span class="heatmap-cell"></span><span class="heatmap-cell level-1"></span><span class="heatmap-cell level-3"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-two">
+      <div class="section" id="books">
+        <div class="panel-title">
+          <h2>最近阅读</h2>
+          <span class="view-tag">书库视图</span>
+        </div>
+        <div class="book-list">
+          <article class="book-row">
+            <div class="cover"></div>
+            <div>
+              <div class="book-name">置身事内</div>
+              <div class="book-meta">兰小欢 · 最近 2026-05-20 · 69 分钟</div>
+              <div class="progress"><span class="bar" style="width: 82%"></span></div>
+            </div>
+          </article>
+          <article class="book-row">
+            <div class="cover"></div>
+            <div>
+              <div class="book-name">纳瓦尔宝典</div>
+              <div class="book-meta">Eric Jorgenson · 最近 2026-05-19 · 29 分钟</div>
+              <div class="progress"><span class="bar" style="width: 54%"></span></div>
+            </div>
+          </article>
+          <article class="book-row">
+            <div class="cover"></div>
+            <div>
+              <div class="book-name">长期主义</div>
+              <div class="book-meta">样例作者 · 最近 2026-05-18 · 15 分钟</div>
+              <div class="progress"><span class="bar" style="width: 35%"></span></div>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div class="section" id="daily">
+        <div class="panel-title">
+          <h2>当月阅读时长分布</h2>
+          <span class="view-tag">来自 assets/monthly-reading.png</span>
+        </div>
+        <div class="monthly-chart" aria-label="当月阅读时长分布预览">
+          <div class="monthly-plot">
+            <div class="monthly-grid"><span></span><span></span><span></span></div>
+            <div class="monthly-bars">
+              <span class="monthly-bar" style="height: 2%"></span>
+              <span class="monthly-bar" style="height: 18%"></span>
+              <span class="monthly-bar" style="height: 56%"></span>
+              <span class="monthly-bar" style="height: 68%"></span>
+              <span class="monthly-bar" style="height: 14%"></span>
+              <span class="monthly-bar" style="height: 9%"></span>
+              <span class="monthly-bar" style="height: 20%"></span>
+              <span class="monthly-bar" style="height: 19%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+              <span class="monthly-bar" style="height: 60%"></span>
+              <span class="monthly-bar" style="height: 14%"></span>
+              <span class="monthly-bar" style="height: 2%"></span>
+              <span class="monthly-bar" style="height: 6%"></span>
+              <span class="monthly-bar" style="height: 3%"></span>
+              <span class="monthly-bar" style="height: 5%"></span>
+              <span class="monthly-bar" style="height: 10%"></span>
+              <span class="monthly-bar" style="height: 3%"></span>
+              <span class="monthly-bar" style="height: 1%"></span>
+              <span class="monthly-bar" style="height: 6%"></span>
+              <span class="monthly-bar" style="height: 32%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+              <span class="monthly-bar" style="height: 0%"></span>
+            </div>
+            <div class="monthly-y"><span>9h</span><span>6h</span><span>3h</span><span>0</span></div>
+            <div class="monthly-x"><span>1</span><span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>30</span></div>
+          </div>
+          <div class="monthly-summary">2026-05 · 125h 10m · 18 个阅读日</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-two">
+      <div class="section" id="notes">
+        <div class="panel-title">
+          <h2>最近笔记</h2>
+          <span class="view-tag">笔记视图</span>
+        </div>
+        <div class="note-list">
+          <article class="note-row">
+            <div class="note-book">置身事内 · 想法</div>
+            <div class="note-meta">创建于 2026-05-20</div>
+            <p class="note-text">这类笔记适合放在首页预览，但完整内容仍然进入数据库，方便搜索和筛选。</p>
+          </article>
+          <article class="note-row">
+            <div class="note-book">纳瓦尔宝典 · 想法</div>
+            <div class="note-meta">创建于 2026-05-19</div>
+            <p class="note-text">把真正会改变判断的想法放进最近笔记，普通划线单独进入最近划线。</p>
+          </article>
+          <article class="note-row">
+            <div class="note-book">长期主义 · 想法</div>
+            <div class="note-meta">创建于 2026-05-18</div>
+            <p class="note-text">重要的不是读完多少，而是哪些内容反复改变了你的判断。</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="panel-title">
+          <h2>最近划线</h2>
+          <span class="view-tag">划线视图</span>
+        </div>
+        <div class="note-list">
+          <article class="note-row">
+            <div class="note-book">置身事内 · 划线</div>
+            <div class="note-meta">第 2 章 · 2026-05-20</div>
+            <p class="note-text">地方政府的激励和约束，决定了很多经济现象背后的真实运行方式。</p>
+          </article>
+          <article class="note-row">
+            <div class="note-book">长期主义 · 划线</div>
+            <div class="note-meta">第 1 章 · 2026-05-18</div>
+            <p class="note-text">重要的不是读完多少，而是哪些内容反复改变了你的判断。</p>
+          </article>
+          <article class="note-row">
+            <div class="note-book">纳瓦尔宝典 · 划线</div>
+            <div class="note-meta">财富与幸福 · 2026-05-17</div>
+            <p class="note-text">清晰思考比堆积信息更稀缺，也更值得长期训练。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="insights">
+      <div class="section-header">
+        <h2>阅读画像</h2>
+        <div class="section-note">来自 WeRead 阅读统计：偏好、时段、分布、作者和版权方</div>
+      </div>
+      <div class="insight-grid">
+        <article class="insight-card">
+          <div class="insight-title">
+            <h3>偏好阅读文学</h3>
+            <span>分类雷达</span>
+          </div>
+          <div class="radar-wrap">
+            <svg width="220" height="170" viewBox="0 0 220 170" role="img" aria-label="阅读分类偏好雷达图">
+              <g fill="none" stroke="#e2e0d8">
+                <polygon points="110,18 175,48 190,112 110,150 30,112 45,48"></polygon>
+                <polygon points="110,42 152,62 162,104 110,128 58,104 68,62"></polygon>
+                <polygon points="110,66 130,76 135,96 110,108 85,96 90,76"></polygon>
+                <line x1="110" y1="18" x2="110" y2="150"></line>
+                <line x1="30" y1="112" x2="190" y2="112"></line>
+                <line x1="45" y1="48" x2="175" y2="48"></line>
+              </g>
+              <polygon points="110,28 156,74 177,110 121,124 93,112 61,101 88,72" fill="rgba(83, 180, 230, 0.42)" stroke="#45aede" stroke-width="2"></polygon>
+              <g fill="#6d706a" font-size="11" text-anchor="middle">
+                <text x="110" y="12">文学</text>
+                <text x="190" y="46">历史</text>
+                <text x="196" y="120">玄幻小说</text>
+                <text x="110" y="166">社会小说</text>
+                <text x="24" y="120">影视原著</text>
+                <text x="34" y="46">男生小说</text>
+              </g>
+            </svg>
+          </div>
+        </article>
+
+        <article class="insight-card">
+          <div class="insight-title">
+            <h3>偏好下午与夜晚阅读</h3>
+            <span>24 小时分布</span>
+          </div>
+          <div>
+            <div class="bars" aria-label="阅读时段柱状图">
+              <span class="time-bar" style="height: 15%"></span>
+              <span class="time-bar" style="height: 22%"></span>
+              <span class="time-bar" style="height: 58%"></span>
+              <span class="time-bar" style="height: 55%"></span>
+              <span class="time-bar" style="height: 51%"></span>
+              <span class="time-bar" style="height: 48%"></span>
+              <span class="time-bar" style="height: 62%"></span>
+              <span class="time-bar" style="height: 70%"></span>
+              <span class="time-bar" style="height: 72%"></span>
+              <span class="time-bar" style="height: 50%"></span>
+              <span class="time-bar" style="height: 38%"></span>
+              <span class="time-bar" style="height: 46%"></span>
+              <span class="time-bar" style="height: 48%"></span>
+              <span class="time-bar" style="height: 80%"></span>
+              <span class="time-bar" style="height: 92%"></span>
+              <span class="time-bar" style="height: 100%"></span>
+              <span class="time-bar" style="height: 75%"></span>
+              <span class="time-bar" style="height: 29%"></span>
+              <span class="time-bar" style="height: 16%"></span>
+            </div>
+            <div class="chart-axis">
+              <span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="insight-card">
+          <div class="insight-title">
+            <h3>书籍分布</h3>
+            <span>累计阅读 62 本</span>
+          </div>
+          <div class="donut-wrap">
+            <svg width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="书籍分布环形图">
+              <circle cx="90" cy="90" r="58" fill="none" stroke="#ffbe69" stroke-width="28" stroke-dasharray="110 365" stroke-dashoffset="0"></circle>
+              <circle cx="90" cy="90" r="58" fill="none" stroke="#ff806a" stroke-width="28" stroke-dasharray="104 365" stroke-dashoffset="-110"></circle>
+              <circle cx="90" cy="90" r="58" fill="none" stroke="#58c3ed" stroke-width="28" stroke-dasharray="72 365" stroke-dashoffset="-214"></circle>
+              <circle cx="90" cy="90" r="58" fill="none" stroke="#8bd7f6" stroke-width="28" stroke-dasharray="52 365" stroke-dashoffset="-286"></circle>
+              <circle cx="90" cy="90" r="35" fill="#fbfbf9"></circle>
+              <text x="90" y="86" text-anchor="middle" font-size="18" font-weight="760" fill="#232522">62</text>
+              <text x="90" y="106" text-anchor="middle" font-size="11" fill="#6d706a">本</text>
+            </svg>
+          </div>
+          <div class="donut-legend">
+            <div class="legend-row"><span><i class="dot" style="background:#ffbe69"></i>制作类</span><strong>21 本</strong></div>
+            <div class="legend-row"><span><i class="dot" style="background:#ff806a"></i>好评如潮</span><strong>20 本</strong></div>
+            <div class="legend-row"><span><i class="dot" style="background:#58c3ed"></i>能发人省</span><strong>11 本</strong></div>
+          </div>
+        </article>
+
+        <article class="insight-card">
+          <div class="insight-title">
+            <h3>点评分布</h3>
+            <span>累计点评 6 条</span>
+          </div>
+          <div class="donut-wrap">
+            <svg width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="点评分布环形图">
+              <circle cx="90" cy="90" r="58" fill="none" stroke="#8cf45d" stroke-width="28" stroke-dasharray="244 365" stroke-dashoffset="0"></circle>
+              <circle cx="90" cy="90" r="58" fill="none" stroke="#45d6e4" stroke-width="28" stroke-dasharray="121 365" stroke-dashoffset="-244"></circle>
+              <circle cx="90" cy="90" r="35" fill="#fbfbf9"></circle>
+              <text x="90" y="88" text-anchor="middle" font-size="18" font-weight="760" fill="#232522">6</text>
+              <text x="90" y="108" text-anchor="middle" font-size="11" fill="#6d706a">条</text>
+            </svg>
+          </div>
+          <div class="donut-legend">
+            <div class="legend-row"><span><i class="dot" style="background:#8cf45d"></i>推荐</span><strong>4 条</strong></div>
+            <div class="legend-row"><span><i class="dot" style="background:#45d6e4"></i>认为一般</span><strong>2 条</strong></div>
+          </div>
+        </article>
+
+        <article class="insight-card">
+          <div class="insight-title">
+            <h3>偏好作者</h3>
+            <span>作者词云</span>
+          </div>
+          <div class="word-cloud" aria-label="偏好作者词云">
+            <span>江南</span><span>马伯庸</span><span>金庸</span><span>鲁迅</span>
+            <span>赫尔曼·黑塞</span><span>刘慈欣</span><span>弗朗西斯·菲茨杰拉德</span><span>当年明月</span><span>梁文道</span>
+          </div>
+        </article>
+
+        <article class="insight-card">
+          <div class="insight-title">
+            <h3>偏好版权方</h3>
+            <span>出版词云</span>
+          </div>
+          <div class="word-cloud" aria-label="偏好版权方词云">
+            <span>果麦文化</span><span>北京市报刊发行局</span><span>博集新媒</span><span>磨铁数盟</span>
+            <span>人民文学出版社</span><span>名润文化</span><span>读客文化</span><span>译林出版社</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="databases">
+      <div class="section-header">
+        <h2>数据与能力入口</h2>
+        <div class="section-note">推荐好书来自 WeRead Skill，四个数据库保留为 Notion 原生库</div>
+      </div>
+      <div class="database-grid">
+        <article class="database-card">
+          <div>
+            <div class="database-title">推荐好书</div>
+            <p class="database-copy">调用 WeRead Skill 的个性化推荐，展示书名、作者、评分和推荐理由。</p>
+          </div>
+          <div class="database-fields">
+            <span class="field">推荐理由</span>
+            <span class="field">评分</span>
+            <span class="field">在读人数</span>
+          </div>
+        </article>
+        <article class="database-card">
+          <div>
+            <div class="database-title">书库</div>
+            <p class="database-copy">保存书架、阅读状态、最近阅读、阅读时长和微信读书链接。</p>
+          </div>
+          <div class="database-fields">
+            <span class="field">书名</span>
+            <span class="field">状态</span>
+            <span class="field">最近阅读</span>
+          </div>
+        </article>
+        <article class="database-card">
+          <div>
+            <div class="database-title">笔记</div>
+            <p class="database-copy">保存划线和想法，按书名、类型、章节和创建时间筛选。</p>
+          </div>
+          <div class="database-fields">
+            <span class="field">内容</span>
+            <span class="field">类型</span>
+            <span class="field">章节</span>
+          </div>
+        </article>
+        <article class="database-card">
+          <div>
+            <div class="database-title">每日阅读</div>
+            <p class="database-copy">保存每天阅读时长，支撑热力图、日历和后续图表。</p>
+          </div>
+          <div class="database-fields">
+            <span class="field">日期</span>
+            <span class="field">分钟</span>
+            <span class="field">周</span>
+          </div>
+        </article>
+        <article class="database-card">
+          <div>
+            <div class="database-title">同步快照</div>
+            <p class="database-copy">记录每次同步的状态、数量、热力图链接和运行信息。</p>
+          </div>
+          <div class="database-fields">
+            <span class="field">Status</span>
+            <span class="field">Books</span>
+            <span class="field">Notes</span>
+          </div>
+        </article>
+      </div>
+      <div class="notion-map">
+        <strong>同步到 Notion 时的映射：</strong>
+        顶部自定义句子会转换为 quote/callout，热力图、当月阅读时长分布和阅读画像会转换为 image block，最近内容转换为列表或分栏，五个数据入口保留为 child database。
+      </div>
+    </section>
+  </main>
+</body>
+</html>

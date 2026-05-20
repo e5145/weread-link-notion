@@ -4,7 +4,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from .config import Config
-from .sync import generate_heatmap_assets, run_sync, build_client
+from .sync import generate_heatmap_assets, generate_monthly_chart_assets, generate_profile_assets, run_sync, build_client
 
 
 def main(argv=None):
@@ -16,6 +16,12 @@ def main(argv=None):
 
     heatmap_parser = subparsers.add_parser("heatmap", help="Generate heatmap image assets.")
     heatmap_parser.add_argument("--year", type=int, default=datetime.now().year)
+
+    monthly_parser = subparsers.add_parser("monthly-chart", help="Generate this month's reading chart image assets.")
+    monthly_parser.add_argument("--year", type=int, default=None)
+    monthly_parser.add_argument("--month", type=int, default=None)
+
+    subparsers.add_parser("profile", help="Generate reading profile image assets.")
 
     sync_parser = subparsers.add_parser("sync", help="Sync WeRead data to Notion.")
     sync_parser.add_argument("--skip-notes", action="store_true", help="Skip note/highlight export for this run.")
@@ -38,6 +44,18 @@ def main(argv=None):
         if not config.weread_api_key:
             raise RuntimeError("WEREAD_API_KEY is required.")
         generate_heatmap_assets(config, args.year)
+        return 0
+
+    if args.command == "monthly-chart":
+        if not config.weread_api_key:
+            raise RuntimeError("WEREAD_API_KEY is required.")
+        generate_monthly_chart_assets(config, args.year, args.month)
+        return 0
+
+    if args.command == "profile":
+        if not config.weread_api_key:
+            raise RuntimeError("WEREAD_API_KEY is required.")
+        generate_profile_assets(config)
         return 0
 
     if args.command == "sync":

@@ -6,7 +6,9 @@
 |---|---|
 | `Check connection` | `WEREAD_API_KEY`、`NOTION_TOKEN`、`NOTION_PAGE` 有问题 |
 | `Generate heatmap` | 微信读书阅读数据获取失败，或热力图生成失败 |
-| `Publish heatmap assets` | GitHub Actions 没有写仓库权限 |
+| `Generate monthly reading chart` | 当月阅读数据获取失败，或图表生成失败 |
+| `Generate reading profile` | 阅读画像接口暂时不可用，或图片生成失败 |
+| `Publish visual assets` | GitHub Actions 没有写仓库权限 |
 | `Sync Notion` | Notion token、页面权限或页面链接有问题 |
 
 ## Actions 里没有同步任务
@@ -93,7 +95,7 @@ WEREAD_API_KEY=wrk-xxxxxxxx
 - 确认 `NOTION_PAGE` 是普通页面链接，不是数据库链接。
 - 确认你没有把页面移到另一个未授权的 workspace。
 
-## 热力图没有显示
+## 热力图、当月图或阅读画像没有显示
 
 先看仓库里有没有生成文件：
 
@@ -101,15 +103,19 @@ WEREAD_API_KEY=wrk-xxxxxxxx
 assets/heatmap.png
 assets/heatmap.svg
 assets/heatmap.json
+assets/monthly-reading.png
+assets/monthly-reading.json
+assets/reading-profile.png
+assets/reading-profile.json
 ```
 
 ### 仓库里没有这些文件
 
-说明 `Generate heatmap` 或 `Publish heatmap assets` 失败。
+说明 `Generate heatmap`、`Generate monthly reading chart`、`Generate reading profile` 或 `Publish visual assets` 失败。
 
 检查：
 
-1. GitHub Actions 日志里 `Generate heatmap` 是否成功。
+1. GitHub Actions 日志里三个生成步骤是否成功。
 2. 仓库 `Settings -> Actions -> General` 里，Workflow permissions 是否允许写入。
 3. `.github/workflows/sync.yml` 里是否有：
 
@@ -124,44 +130,18 @@ permissions:
 
 1. `Sync Notion` 步骤是否成功。
 2. Notion 页面是否刷新过。
-3. `同步快照` 数据库里最新记录的 `Heatmap` 字段是否有链接。
-4. 仓库如果是私有仓库，Notion 可能无法稳定加载 raw 图片链接。此时仍可以查看 `每日阅读` 数据库，热力图文件也会保留在 GitHub 仓库里。
+3. `同步快照` 数据库里最新记录的 `Heatmap`、`Monthly Chart`、`Reading Profile` 字段是否有链接。
+4. 仓库如果是私有仓库，Notion 可能无法稳定加载 raw 图片链接。此时仍可以查看 `每日阅读` 数据库，图表文件也会保留在 GitHub 仓库里。
 
 ## Actions 跑了很久
 
 第一次同步笔记可能比较慢，因为要逐本书读取划线和想法。
 
-可以先限制笔记数量：
+项目默认把书库、每日阅读、笔记、推荐好书、当月图、热力图和阅读画像都同步完整。第一次运行慢一点是正常的，后续会快一些。
 
-```text
-MAX_NOTEBOOKS=5
-```
+## GitHub 自动提交图表失败
 
-路径：
-
-```text
-Settings -> Secrets and variables -> Actions -> Variables
-```
-
-确认流程跑通以后，再改回：
-
-```text
-MAX_NOTEBOOKS=0
-```
-
-## 不想同步笔记
-
-添加 GitHub Variable：
-
-```text
-SYNC_NOTES=false
-```
-
-这样只同步书库、每日阅读和热力图。
-
-## GitHub 自动提交热力图失败
-
-如果 `Publish heatmap assets` 报权限错误，检查仓库设置：
+如果 `Publish visual assets` 报权限错误，检查仓库设置：
 
 ```text
 Settings -> Actions -> General -> Workflow permissions

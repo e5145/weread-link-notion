@@ -34,6 +34,9 @@ class Config:
     github_branch: str
     skill_version: str = "1.0.3"
     heatmap_path: str = "assets/heatmap.png"
+    monthly_chart_path: str = "assets/monthly-reading.png"
+    profile_path: str = "assets/reading-profile.png"
+    dashboard_quote: str = "看书真好"
     sync_notes: bool = True
     max_notebooks: int = 0
     request_timeout: int = 30
@@ -49,6 +52,9 @@ class Config:
             github_branch=ref_name or os.getenv("GITHUB_BRANCH", "main"),
             skill_version=os.getenv("WEREAD_SKILL_VERSION", "1.0.3").strip() or "1.0.3",
             heatmap_path=os.getenv("HEATMAP_PATH", "assets/heatmap.png").strip(),
+            monthly_chart_path=os.getenv("MONTHLY_CHART_PATH", "assets/monthly-reading.png").strip(),
+            profile_path=os.getenv("READING_PROFILE_PATH", "assets/reading-profile.png").strip(),
+            dashboard_quote=os.getenv("DASHBOARD_QUOTE", "看书真好").strip() or "看书真好",
             sync_notes=_bool_env("SYNC_NOTES", True),
             max_notebooks=_int_env("MAX_NOTEBOOKS", 0),
             request_timeout=_int_env("WEREAD_API_TIMEOUT", 30),
@@ -70,4 +76,18 @@ class Config:
         if not self.github_repository:
             return ""
         path = self.heatmap_path.lstrip("/")
+        return f"https://raw.githubusercontent.com/{self.github_repository}/{self.github_branch}/{path}"
+
+    @property
+    def profile_url(self):
+        if not self.github_repository:
+            return ""
+        path = self.profile_path.lstrip("/")
+        return f"https://raw.githubusercontent.com/{self.github_repository}/{self.github_branch}/{path}"
+
+    @property
+    def monthly_chart_url(self):
+        if not self.github_repository:
+            return ""
+        path = self.monthly_chart_path.lstrip("/")
         return f"https://raw.githubusercontent.com/{self.github_repository}/{self.github_branch}/{path}"

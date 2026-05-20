@@ -173,7 +173,7 @@ New repository secret
 
 保存后，GitHub 页面不会再显示 Secret 的明文，这是正常的。
 
-## 8. 可选：添加 GitHub Variables
+## 8. 可选：修改首页句子
 
 进入：
 
@@ -181,24 +181,11 @@ New repository secret
 Settings -> Secrets and variables -> Actions -> Variables
 ```
 
-可选添加：
+这个不是功能开关，只是改 Notion 首页顶部那句话。不填也能正常同步。
 
 | Name | 推荐值 | 说明 |
 |---|---|---|
-| `SYNC_NOTES` | `true` | 是否同步划线和想法 |
-| `MAX_NOTEBOOKS` | `0` | 同步多少本书的笔记，`0` 表示不限 |
-
-如果你第一次运行怕太慢，可以先填：
-
-```text
-MAX_NOTEBOOKS=5
-```
-
-跑通以后再改成：
-
-```text
-MAX_NOTEBOOKS=0
-```
+| `DASHBOARD_QUOTE` | `看书真好` | 阅读面板顶部显示的句子 |
 
 ## 9. 第一次运行
 
@@ -214,9 +201,10 @@ MAX_NOTEBOOKS=0
 1. 检查三个环境变量是否存在。
 2. 检查微信读书 API 是否能访问。
 3. 生成 `assets/heatmap.png`、`assets/heatmap.svg`、`assets/heatmap.json`。
-4. 把热力图文件提交回 GitHub 仓库。
-5. 在 Notion 页面下创建阅读面板和数据库。
-6. 同步书架、每日阅读、笔记。
+4. 生成 `assets/monthly-reading.png` 和 `assets/reading-profile.png`。
+5. 把图表文件提交回 GitHub 仓库。
+6. 在 Notion 页面下创建阅读面板和数据库。
+7. 同步书架、每日阅读、笔记和推荐好书。
 
 第一次可能比后续运行慢，这是正常的。
 
@@ -230,15 +218,22 @@ GitHub Actions 运行成功后，检查两处。
 assets/heatmap.png
 assets/heatmap.svg
 assets/heatmap.json
+assets/monthly-reading.png
+assets/monthly-reading.json
+assets/reading-profile.png
+assets/reading-profile.json
 ```
 
 Notion 页面里应该出现：
 
 ```text
 阅读热力图
+当月阅读时长分布
+阅读画像
 书库
 笔记
 每日阅读
+推荐好书
 同步快照
 ```
 
@@ -285,6 +280,8 @@ copy .env.example .env
 ```bash
 python -m weread_link_notion check
 python -m weread_link_notion heatmap
+python -m weread_link_notion monthly-chart
+python -m weread_link_notion profile
 python -m weread_link_notion sync
 ```
 

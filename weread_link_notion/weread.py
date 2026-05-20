@@ -140,5 +140,8 @@ class WeReadClient:
     def get_read_summary(self, mode="annually"):
         return self.call("/readdata/detail", mode=mode, baseTime=0)
 
+    def get_recommendations(self, count=6):
+        return self.call("/book/recommend", count=count, maxIdx=0)
+
     def get_book_info(self, book_id):
         return self.call("/book/info", bookId=book_id)

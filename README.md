@@ -1,15 +1,16 @@
 # WeRead Link Notion
 
-把微信读书的书架、划线、想法、每日阅读时长和阅读热力图自动同步到 Notion。
+把微信读书的书架、划线、想法、每日阅读时长、推荐好书、当月阅读图、阅读画像和阅读热力图自动同步到 Notion。
 
 这个项目适合不想每天手动整理读书记录的人：配置一次以后，GitHub Actions 会每天自动运行，把最新数据写进你的 Notion 阅读面板。
 
 ## 你最终会得到什么
 
-- 一个 Notion 阅读首页，包含阅读热力图、最近同步预览和一组完整数据入口。
+- 一个 Notion 阅读首页，包含自定义句子、连续阅读天数、当月阅读时长分布、阅读热力图、阅读画像、最近内容和完整数据入口。
 - 一个 `书库` 数据库，保存微信读书书架里的电子书、有声书和文章收藏入口。
 - 一个 `笔记` 数据库，保存划线和个人想法。
 - 一个 `每日阅读` 数据库，保存每天的阅读秒数、分钟数、年月周字段。
+- 一个 `推荐好书` 数据库，保存微信读书 Skill 返回的个性化推荐。
 - 一个 `同步快照` 数据库，记录每次同步是否成功、同步了多少书和笔记。
 - 一个每天自动运行的 GitHub Actions workflow。
 
@@ -18,7 +19,8 @@
 - 不再使用微信读书 Cookie。
 - 使用 `WEREAD_API_KEY` 访问微信读书官方 Skill / Agent API。
 - 使用 Notion 官方 API 写入数据。
-- 热力图由项目自己生成 `assets/heatmap.png` 和 `assets/heatmap.svg`，再嵌入 Notion。
+- 当月阅读时长分布、热力图和阅读画像由项目自己生成到 `assets/`，再嵌入 Notion。
+- 推荐好书、阅读画像、最近划线和连续阅读天数默认都会同步，不需要用户额外开启。
 - 只保留同步需要的核心代码和文档，减少第三方依赖。
 
 ## 新手先看这里
@@ -81,7 +83,7 @@ Settings -> Secrets and variables -> Actions -> New repository secret
 | `NOTION_TOKEN` | `secret_...` 或 `ntn_...` |
 | `NOTION_PAGE` | `https://www.notion.so/...` |
 
-## 可选 Variables
+## 页面文案 Variable
 
 进入仓库：
 
@@ -89,29 +91,18 @@ Settings -> Secrets and variables -> Actions -> New repository secret
 Settings -> Secrets and variables -> Actions -> Variables
 ```
 
+你只需要三个 Secrets。下面这个 Variable 不是必须，只是用来改首页那句自定义文案：
+
 | Variable | 默认值 | 说明 |
-|---|---:|---|
-| `SYNC_NOTES` | `true` | 是否同步划线和想法 |
-| `MAX_NOTEBOOKS` | `0` | 笔记同步的书籍上限，`0` 表示不限 |
-
-第一次测试时，如果你的笔记很多，可以先设置：
-
-```text
-MAX_NOTEBOOKS=5
-```
-
-确认流程跑通后再改回：
-
-```text
-MAX_NOTEBOOKS=0
-```
+|---|---|---|
+| `DASHBOARD_QUOTE` | `看书真好` | Notion 首页顶部显示的句子 |
 
 ## 项目结构
 
 ```text
 weread-link-notion/
   .github/workflows/sync.yml      # GitHub Actions 自动同步任务
-  assets/                         # 热力图输出目录
+  assets/                         # 图表、热力图和阅读画像输出目录
   docs/                           # 新手说明和排错文档
   scripts/setup_secrets.py         # 三个密钥的辅助向导
   weread_link_notion/              # 同步器源码
@@ -133,6 +124,8 @@ pip install -e .
 cp .env.example .env
 python -m weread_link_notion check
 python -m weread_link_notion heatmap
+python -m weread_link_notion monthly-chart
+python -m weread_link_notion profile
 python -m weread_link_notion sync
 ```
 
