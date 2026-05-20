@@ -113,6 +113,17 @@ class NotionStore:
             if block.get("has_children") and block.get("type") != "child_database":
                 yield from self._walk_blocks(block["id"])
 
+    def reset_page(self):
+        for block in self._children(self.page_id):
+            self._archive_block(block["id"])
+        self.databases = {}
+        self.page_cache = {}
+        return self._notion(
+            self.client.blocks.children.append,
+            block_id=self.page_id,
+            children=[_paragraph(f"{DASHBOARD_SNAPSHOT_PREFIX}reset anchor")],
+        )
+
     def rebuild_dashboard(
         self,
         counts,
@@ -128,99 +139,20 @@ class NotionStore:
     ):
         now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
         anchor_id = self._find_managed_dashboard_anchor_id()
-        recommendations = recommendations or []
-        children = [
-            _quote(dashboard_quote),
-            _paragraph(
-                "首页只放高频信息：今年读了多久、哪些书最近在读、最近产生了哪些划线和想法。完整数据留在下方数据库，页面保持轻，不把 Notion 堆成流水账。"
-            ),
-            _divider(),
-            _heading_3("年度概览"),
-            _paragraph(
-                f"书库 {counts.get('books', 0)} 本  ·  "
-                f"笔记 {counts.get('notes', 0)} 条  ·  "
-                f"阅读日 {counts.get('read_days', 0)} 天  ·  "
-                f"连续阅读 {streak_days} 天  ·  "
-                f"今年 {counts.get('read_minutes', 0)} 分钟"
-            ),
-        ]
-        if heatmap_url:
-            children.extend(
-                [
-                    _divider(),
-                    _heading_3("阅读热力图"),
-                    _paragraph(f"连续阅读 {streak_days} 天。来自 assets/heatmap.png，每次同步自动刷新。"),
-                    _image_payload(heatmap_url, HEATMAP_MARKER),
-                ]
-            )
-
-        children.extend(
-            [
-                _divider(),
-                _heading_3("最近阅读"),
-            ]
+        dashboard_blocks = _dashboard_blocks(
+            now,
+            counts,
+            books,
+            notes,
+            daily_rows,
+            recommendations or [],
+            heatmap_url,
+            profile_url,
+            monthly_chart_url,
+            dashboard_quote,
+            streak_days,
         )
-        for book in _recent_books(books, limit=5):
-            children.append(_bulleted_list_item(_format_book_preview(book)))
-        if children[-1].get("type") == "heading_3":
-            children.append(_bulleted_list_item("暂时没有最近阅读书籍。"))
-
-        children.extend([_heading_3("当月阅读时长分布")])
-        if monthly_chart_url:
-            children.append(_image_payload(monthly_chart_url, MONTHLY_CHART_MARKER))
-        else:
-            for row in _recent_daily_rows(daily_rows, limit=5):
-                children.append(_bulleted_list_item(_format_daily_preview(row)))
-            if children[-1].get("type") == "heading_3":
-                children.append(_bulleted_list_item("暂时没有每日阅读数据。"))
-
-        children.extend([_divider(), _heading_3("最近笔记")])
-        for note in _recent_thoughts(notes, limit=5):
-            children.append(_bulleted_list_item(_format_note_preview(note)))
-        if children[-1].get("type") == "heading_3":
-            children.append(_bulleted_list_item("暂时没有想法笔记。"))
-
-        children.extend([_heading_3("最近划线")])
-        for note in _recent_highlights(notes, limit=5):
-            children.append(_bulleted_list_item(_format_note_preview(note)))
-        if children[-1].get("type") == "heading_3":
-            children.append(_bulleted_list_item("暂时没有划线。"))
-
-        children.extend([_divider(), _heading_3("推荐好书")])
-        for recommendation in recommendations[:6]:
-            children.append(_bulleted_list_item(_format_recommendation_preview(recommendation)))
-        if children[-1].get("type") == "heading_3":
-            children.append(_bulleted_list_item("暂时没有拿到推荐书籍，下次同步会继续尝试。"))
-
-        if profile_url:
-            children.extend(
-                [
-                    _divider(),
-                    _heading_3("阅读画像"),
-                    _paragraph("偏好分类、阅读时段、书籍分布、点评分布、偏好作者和版权方会被生成到 assets/reading-profile.png。"),
-                    _image_payload(profile_url, PROFILE_MARKER),
-                ]
-            )
-
-        children.extend(
-            [
-                _divider(),
-                _heading_3("数据与能力入口"),
-                _bulleted_list_item("推荐好书：来自 weread.skill 的个性化推荐接口，每次同步自动更新。"),
-                _bulleted_list_item("书库：保存书架、阅读状态、最近阅读、阅读时长和微信读书链接。"),
-                _bulleted_list_item("笔记：保存划线和想法，按书名、类型、章节和创建时间筛选。"),
-                _bulleted_list_item("每日阅读：保存每天阅读时长，支撑热力图、日历和图表。"),
-                _bulleted_list_item("同步快照：记录每次运行状态、数量、热力图和画像链接，方便排错。"),
-            ]
-        )
-
-        dashboard = _callout(
-            f"{DASHBOARD_TITLE_PREFIX}{now}",
-            icon="📖",
-            color="blue_background",
-            children=children,
-        )
-        kwargs = {"block_id": self.page_id, "children": [dashboard]}
+        kwargs = {"block_id": self.page_id, "children": dashboard_blocks}
         if anchor_id:
             kwargs["after"] = anchor_id
         response = self._notion(self.client.blocks.children.append, **kwargs)
@@ -377,18 +309,34 @@ class NotionStore:
         return None
 
     def _find_managed_dashboard_anchor_id(self):
-        for block in self._children(self.page_id):
-            if self._is_managed_dashboard_block(block):
-                return block["id"]
-        return None
+        ids = self._managed_dashboard_block_ids()
+        return ids[-1] if ids else None
 
     def _cleanup_managed_dashboard(self, exclude_ids=None):
         exclude_ids = exclude_ids or set()
+        managed_ids = set(self._managed_dashboard_block_ids())
         for block in self._children(self.page_id):
             if block["id"] in exclude_ids:
                 continue
-            if self._is_managed_dashboard_block(block):
+            if block["id"] in managed_ids or self._is_managed_dashboard_block(block):
                 self._archive_block(block["id"])
+
+    def _managed_dashboard_block_ids(self):
+        blocks = self._children(self.page_id)
+        ids = []
+        collecting = False
+        for block in blocks:
+            if block.get("type") == "child_database":
+                if collecting:
+                    break
+                continue
+            if self._is_managed_dashboard_block(block):
+                collecting = True
+            if collecting:
+                ids.append(block["id"])
+        if ids:
+            return ids
+        return [block["id"] for block in blocks if self._is_managed_dashboard_block(block)]
 
     def _is_managed_dashboard_block(self, block):
         text = _plain_text_from_block(block)
@@ -398,7 +346,7 @@ class NotionStore:
             return True
         if DASHBOARD_MARKER in text:
             return True
-        if "微信读书同步面板" in text or text == "阅读热力图":
+        if "微信读书同步面板" in text or text in ("阅读总览", "READING DASHBOARD", "阅读热力图"):
             return True
         if block.get("type") == "image":
             return self._is_managed_asset_block(block)
@@ -624,6 +572,99 @@ def _runs_schema():
     }
 
 
+def _dashboard_blocks(
+    now,
+    counts,
+    books,
+    notes,
+    daily_rows,
+    recommendations,
+    heatmap_url,
+    profile_url,
+    monthly_chart_url,
+    dashboard_quote,
+    streak_days,
+):
+    blocks = [
+        _heading_1("阅读总览"),
+        _paragraph(f"{DASHBOARD_MARKER} · 自动同步于 {now}"),
+        _quote(dashboard_quote),
+        _paragraph(
+            "首页只放高频信息：今年读了多久、哪些书最近在读、最近产生了哪些划线和想法。完整数据留在下方数据库，页面保持轻，不把 Notion 堆成流水账。"
+        ),
+        _column_list(
+            [
+                [_metric_card("书库", f"{counts.get('books', 0)} 本", "书架、阅读状态、封面和链接", "📚")],
+                [_metric_card("笔记", f"{counts.get('notes', 0)} 条", "划线和想法都进入数据库", "✍️")],
+                [_metric_card("阅读日", f"{counts.get('read_days', 0)} 天", f"连续阅读 {streak_days} 天", "📅")],
+                [_metric_card("今年阅读", f"{counts.get('read_minutes', 0)} 分钟", "来自微信读书阅读统计", "⏱️")],
+            ]
+        ),
+        _divider(),
+        _heading_2("阅读热力图"),
+        _paragraph(f"连续阅读 {streak_days} 天。来自 assets/heatmap.png，每次同步自动刷新。"),
+    ]
+
+    if heatmap_url:
+        blocks.append(_image_payload(heatmap_url, HEATMAP_MARKER))
+
+    blocks.extend(
+        [
+            _divider(),
+            _column_list(
+                [
+                    _recent_reading_column(books),
+                    _monthly_chart_column(daily_rows, monthly_chart_url),
+                ]
+            ),
+            _divider(),
+            _column_list(
+                [
+                    _recent_notes_column(notes),
+                    _recent_highlights_column(notes),
+                ]
+            ),
+            _divider(),
+            _heading_2("推荐好书"),
+        ]
+    )
+    recommendation_blocks = [_bulleted_list_item(_format_recommendation_preview(item)) for item in recommendations[:6]]
+    if not recommendation_blocks:
+        recommendation_blocks = [_bulleted_list_item("暂时没有拿到推荐书籍，下次同步会继续尝试。")]
+    blocks.extend(recommendation_blocks)
+
+    if profile_url:
+        blocks.extend(
+            [
+                _divider(),
+                _heading_2("阅读画像"),
+                _paragraph("偏好分类、阅读时段、书籍分布、点评分布、偏好作者和版权方会被生成到 assets/reading-profile.png。"),
+                _image_payload(profile_url, PROFILE_MARKER),
+            ]
+        )
+
+    blocks.extend(
+        [
+            _divider(),
+            _heading_2("数据与能力入口"),
+            _column_list(
+                [
+                    [_database_card("推荐好书", "weread.skill 个性化推荐，每次同步自动更新。", "✨")],
+                    [_database_card("书库", "书架、阅读状态、最近阅读、阅读时长和微信读书链接。", "📚")],
+                    [_database_card("笔记", "划线和想法，按书名、类型、章节和创建时间筛选。", "📝")],
+                ]
+            ),
+            _column_list(
+                [
+                    [_database_card("每日阅读", "每天阅读时长，支撑热力图、日历和图表。", "📈")],
+                    [_database_card("同步快照", "每次运行状态、数量、热力图和画像链接，方便排错。", "✅")],
+                ]
+            ),
+        ]
+    )
+    return blocks
+
+
 def _options(names):
     colors = ["blue", "green", "yellow", "orange", "purple", "pink", "gray"]
     return [{"name": name, "color": colors[index % len(colors)]} for index, name in enumerate(names)]
@@ -677,6 +718,67 @@ def _callout(text, icon="📚", color="default", children=None):
         "type": "callout",
         "callout": payload,
     }
+
+
+def _column_list(columns):
+    if len(columns) == 1:
+        columns = [columns[0], [_paragraph("")]]
+    return {
+        "object": "block",
+        "type": "column_list",
+        "column_list": {"children": [_column(children) for children in columns]},
+    }
+
+
+def _column(children):
+    return {
+        "object": "block",
+        "type": "column",
+        "column": {"children": children},
+    }
+
+
+def _metric_card(label, value, hint, icon):
+    return _callout(f"{label}\n{value}\n{hint}", icon=icon, color="gray_background")
+
+
+def _database_card(title_text, body, icon):
+    return _callout(f"{title_text}\n{body}", icon=icon, color="default")
+
+
+def _recent_reading_column(books):
+    children = [_heading_3("最近阅读")]
+    children.extend(_bulleted_list_item(_format_book_preview(book)) for book in _recent_books(books, limit=5))
+    if len(children) == 1:
+        children.append(_bulleted_list_item("暂时没有最近阅读书籍。"))
+    return children
+
+
+def _monthly_chart_column(daily_rows, monthly_chart_url):
+    children = [_heading_3("当月阅读时长分布")]
+    if monthly_chart_url:
+        children.append(_image_payload(monthly_chart_url, MONTHLY_CHART_MARKER))
+        return children
+    children.extend(_bulleted_list_item(_format_daily_preview(row)) for row in _recent_daily_rows(daily_rows, limit=5))
+    if len(children) == 1:
+        children.append(_bulleted_list_item("暂时没有每日阅读数据。"))
+    return children
+
+
+def _recent_notes_column(notes):
+    children = [_heading_3("最近笔记")]
+    children.extend(_bulleted_list_item(_format_note_preview(note)) for note in _recent_thoughts(notes, limit=5))
+    if len(children) == 1:
+        children.append(_bulleted_list_item("暂时没有想法笔记。"))
+    return children
+
+
+def _recent_highlights_column(notes):
+    children = [_heading_3("最近划线")]
+    children.extend(_bulleted_list_item(_format_note_preview(note)) for note in _recent_highlights(notes, limit=5))
+    if len(children) == 1:
+        children.append(_bulleted_list_item("暂时没有划线。"))
+    return children
 
 
 def _image_payload(image_url, caption):

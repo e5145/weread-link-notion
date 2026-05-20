@@ -2,6 +2,12 @@ name: Sync WeRead Link Notion
 
 on:
   workflow_dispatch:
+    inputs:
+      reset_page:
+        description: "Archive all existing blocks in NOTION_PAGE before rebuilding the dashboard."
+        required: false
+        default: false
+        type: boolean
   schedule:
     # Runs every day at 00:30 Asia/Shanghai.
     - cron: "30 16 * * *"
@@ -68,6 +74,10 @@ jobs:
             git commit -m "update weread visual assets"
             git push
           fi
+
+      - name: Reset Notion page
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.reset_page == true }}
+        run: python -m weread_link_notion reset-page
 
       - name: Sync Notion
         run: python -m weread_link_notion sync

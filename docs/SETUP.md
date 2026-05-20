@@ -255,6 +255,8 @@ Notion 页面里应该出现：
 Actions -> Sync WeRead Link Notion -> Run workflow
 ```
 
+如果你想把 Notion 目标页清空后重新生成完整布局，手动运行时把 `reset_page` 勾上。这个操作会归档 `NOTION_PAGE` 里的所有现有块，然后重新创建阅读面板和五个数据库。
+
 ## 12. 本地测试，可跳过
 
 普通用户不需要本地测试。只有你想改代码时才需要。

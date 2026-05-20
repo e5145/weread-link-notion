@@ -4,6 +4,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from .config import Config
+from .notion import NotionStore
 from .sync import generate_heatmap_assets, generate_monthly_chart_assets, generate_profile_assets, run_sync, build_client
 
 
@@ -13,6 +14,7 @@ def main(argv=None):
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("check", help="Check environment variables and WeRead connectivity.")
+    subparsers.add_parser("reset-page", help="Archive all blocks in the target Notion page before rebuilding.")
 
     heatmap_parser = subparsers.add_parser("heatmap", help="Generate heatmap image assets.")
     heatmap_parser.add_argument("--year", type=int, default=datetime.now().year)
@@ -38,6 +40,13 @@ def main(argv=None):
         albums = len(shelf.get("albums") or [])
         articles = 1 if shelf.get("mp") else 0
         print(f"OK. WeRead shelf visible items: {books + albums + articles} ({books} books, {albums} audiobooks, {articles} article collection).")
+        return 0
+
+    if args.command == "reset-page":
+        config.validate()
+        store = NotionStore(config.notion_token, config.notion_page)
+        store.reset_page()
+        print("OK. Notion page blocks were archived; the next sync will rebuild the dashboard and databases.")
         return 0
 
     if args.command == "heatmap":
