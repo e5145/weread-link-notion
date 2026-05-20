@@ -19,6 +19,7 @@ from .utils import (
 
 DASHBOARD_MARKER = "WeRead Link Notion"
 HEATMAP_MARKER = "WeRead Link Notion heatmap"
+DASHBOARD_SNAPSHOT_PREFIX = "最近同步 ·"
 
 
 BOOKS_DB = "书库"
@@ -66,20 +67,48 @@ class NotionStore:
 
     def _load_child_databases(self):
         self.databases = {}
-        for block in self._walk_blocks(self.page_id):
+        candidates = {name: [] for name in REQUIRED_PROPERTIES}
+        for block in self._children(self.page_id):
             if block.get("type") == "child_database":
                 title_text = block["child_database"]["title"]
                 required = REQUIRED_PROPERTIES.get(title_text)
                 if not required:
                     continue
                 queryable_id = self._queryable_database_id(block["id"])
-                if self._database_has_properties(queryable_id, required):
-                    self.databases[title_text] = queryable_id
+                has_schema = self._database_has_properties(queryable_id, required)
+                has_rows = self._database_has_rows(queryable_id) if has_schema else False
+                candidates[title_text].append(
+                    {
+                        "block_id": block["id"],
+                        "queryable_id": queryable_id,
+                        "has_schema": has_schema,
+                        "has_rows": has_rows,
+                    }
+                )
+
+        for title_text, blocks in candidates.items():
+            valid = [block for block in blocks if block["has_schema"]]
+            if not valid:
+                for block in blocks:
+                    self._archive_block(block["block_id"])
+                continue
+
+            non_empty = [block for block in valid if block["has_rows"]]
+            chosen = (non_empty or valid)[-1]
+            self.databases[title_text] = chosen["queryable_id"]
+
+            if len(valid) <= 1:
+                continue
+            for block in blocks:
+                if block["block_id"] == chosen["block_id"]:
+                    continue
+                if not block["has_schema"] or not block["has_rows"]:
+                    self._archive_block(block["block_id"])
 
     def _walk_blocks(self, block_id):
         for block in self._children(block_id):
             yield block
-            if block.get("has_children"):
+            if block.get("has_children") and block.get("type") != "child_database":
                 yield from self._walk_blocks(block["id"])
 
     def _ensure_dashboard(self, heatmap_url):
@@ -104,6 +133,50 @@ class NotionStore:
             self._notion(self.client.blocks.children.append, block_id=self.page_id, children=children)
         if heatmap_url:
             self.update_heatmap(heatmap_url)
+
+    def update_dashboard_snapshot(self, counts, books, notes, daily_rows):
+        self._delete_dashboard_snapshots()
+        now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
+        preview = [
+            _paragraph(
+                "本次已写入："
+                f"{counts.get('books', 0)} 本书、"
+                f"{counts.get('notes', 0)} 条笔记、"
+                f"{counts.get('read_days', 0)} 个阅读日、"
+                f"{counts.get('read_minutes', 0)} 分钟。"
+            ),
+            _paragraph("完整内容在下方 4 个数据库中；这里显示最近内容，方便一打开页面就确认同步结果。"),
+            _heading_3("最近阅读"),
+        ]
+        for book in _recent_books(books):
+            preview.append(_bulleted_list_item(_format_book_preview(book)))
+        if preview[-1].get("type") == "heading_3":
+            preview.append(_bulleted_list_item("暂时没有最近阅读书籍。"))
+
+        preview.append(_heading_3("最近笔记"))
+        for note in _recent_notes(notes):
+            preview.append(_bulleted_list_item(_format_note_preview(note)))
+        if preview[-1].get("type") == "heading_3":
+            preview.append(_bulleted_list_item("暂时没有笔记。"))
+
+        preview.append(_heading_3("最近阅读日"))
+        for row in _recent_daily_rows(daily_rows):
+            preview.append(_bulleted_list_item(_format_daily_preview(row)))
+        if preview[-1].get("type") == "heading_3":
+            preview.append(_bulleted_list_item("暂时没有每日阅读数据。"))
+
+        snapshot = _quote(f"{DASHBOARD_SNAPSHOT_PREFIX} {now}", preview)
+        heatmap = self._find_heatmap_block()
+        kwargs = {"block_id": self.page_id, "children": [snapshot]}
+        if heatmap and self._is_direct_child_of_page(heatmap):
+            kwargs["after"] = heatmap["id"]
+        return self._notion(self.client.blocks.children.append, **kwargs)
+
+    def _delete_dashboard_snapshots(self):
+        for block in self._children(self.page_id):
+            text = _plain_text_from_block(block)
+            if text.startswith(DASHBOARD_SNAPSHOT_PREFIX):
+                self._archive_block(block["id"])
 
     def _ensure_databases(self):
         specs = {
@@ -248,6 +321,17 @@ class NotionStore:
             return self._notion(self.client.data_sources.query, data_source_id=database_id, **kwargs)
         return self._notion(self.client.databases.query, database_id=database_id, **kwargs)
 
+    def _database_has_rows(self, database_id):
+        try:
+            kwargs = {"page_size": 1}
+            if self._uses_data_sources():
+                response = self._notion(self.client.data_sources.query, data_source_id=database_id, **kwargs)
+            else:
+                response = self._notion(self.client.databases.query, database_id=database_id, **kwargs)
+        except Exception:  # noqa: BLE001 - duplicate cleanup should not block syncing.
+            return False
+        return bool(response.get("results"))
+
     def _load_page_cache(self, database_id, key_property, title_key=False):
         cache = {}
         cursor = None
@@ -266,6 +350,11 @@ class NotionStore:
         if self._uses_data_sources():
             return {"type": "data_source_id", "data_source_id": database_id}
         return {"database_id": database_id}
+
+    def _is_direct_child_of_page(self, block):
+        parent = block.get("parent") or {}
+        page_id = (parent.get("page_id") or "").replace("-", "")
+        return page_id == self.page_id
 
     def _queryable_database_id(self, database_id):
         if not self._uses_data_sources():
@@ -307,6 +396,12 @@ class NotionStore:
         if self._uses_data_sources():
             return self._notion(self.client.data_sources.update, data_source_id=database_id, properties=missing)
         return self._notion(self.client.databases.update, database_id=database_id, properties=missing)
+
+    def _archive_block(self, block_id):
+        try:
+            return self._notion(self.client.blocks.delete, block_id=block_id)
+        except Exception:  # noqa: BLE001 - cleanup is best effort.
+            return None
 
     def _notion(self, func, **kwargs):
         last_error = None
@@ -401,6 +496,29 @@ def _heading_2(text):
     return {"object": "block", "type": "heading_2", "heading_2": {"rich_text": _rt(text)}}
 
 
+def _heading_3(text):
+    return {"object": "block", "type": "heading_3", "heading_3": {"rich_text": _rt(text)}}
+
+
+def _paragraph(text):
+    return {"object": "block", "type": "paragraph", "paragraph": {"rich_text": _rt(text)}}
+
+
+def _bulleted_list_item(text):
+    return {
+        "object": "block",
+        "type": "bulleted_list_item",
+        "bulleted_list_item": {"rich_text": _rt(text)},
+    }
+
+
+def _quote(text, children=None):
+    payload = {"rich_text": _rt(text), "color": "default"}
+    if children:
+        payload["children"] = children
+    return {"object": "block", "type": "quote", "quote": payload}
+
+
 def _callout(text):
     return {
         "object": "block",
@@ -446,3 +564,43 @@ def _property_text(prop, title_key=False):
     if title_key:
         return _plain_text(prop.get("title") or [])
     return _plain_text(prop.get("rich_text") or [])
+
+
+def _recent_books(books, limit=8):
+    return sorted(
+        books,
+        key=lambda book: (book.get("last_read") or "", book.get("sort") or 0),
+        reverse=True,
+    )[:limit]
+
+
+def _recent_notes(notes, limit=10):
+    return sorted(notes, key=lambda note: note.get("created_at") or "", reverse=True)[:limit]
+
+
+def _recent_daily_rows(rows, limit=7):
+    return sorted(rows, key=lambda row: row.get("date") or "", reverse=True)[:limit]
+
+
+def _format_book_preview(book):
+    parts = [f"《{book.get('title') or '未命名'}》"]
+    if book.get("author"):
+        parts.append(str(book["author"]))
+    if book.get("last_read"):
+        parts.append("最近 " + str(book["last_read"]))
+    minutes = book.get("reading_minutes")
+    if minutes:
+        parts.append(f"{minutes} 分钟")
+    return " · ".join(parts)
+
+
+def _format_note_preview(note):
+    book_title = note.get("book_title") or "未知书籍"
+    note_type = note.get("type") or "笔记"
+    content = short_text(note.get("content"), 90).replace("\n", " ")
+    return f"{book_title} · {note_type} · {content}"
+
+
+def _format_daily_preview(row):
+    minutes = round((row.get("seconds") or 0) / 60, 2)
+    return f"{row.get('date')} · {minutes} 分钟"

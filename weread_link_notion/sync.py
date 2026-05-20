@@ -50,19 +50,22 @@ def run_sync(config):
         book_count += 1
 
     read_times = client.get_year_read_times(datetime.now().year)
+    daily_rows = normalize_daily_rows(read_times)
     daily_count = 0
     read_seconds = 0
-    for row in normalize_daily_rows(read_times):
+    for row in daily_rows:
         store.upsert_daily(row)
         daily_count += 1
         read_seconds += row["seconds"]
 
     note_count = 0
+    notes = []
     if config.sync_notes:
         limited = notebooks[: config.max_notebooks] if config.max_notebooks > 0 else notebooks
         print(f"Syncing notes from {len(limited)} notebooks...", flush=True)
         for index, notebook in enumerate(limited, start=1):
             for note in iter_notes_for_notebook(client, notebook):
+                notes.append(note)
                 store.upsert_note(note)
                 note_count += 1
                 if note_count % 100 == 0:
@@ -76,6 +79,7 @@ def run_sync(config):
         "read_days": daily_count,
         "read_minutes": round(read_seconds / 60, 2),
     }
+    store.update_dashboard_snapshot(counts, books, notes, daily_rows)
     store.create_sync_run("success", counts, config.heatmap_url, "Sync completed.")
     print(f"Synced {book_count} books, {note_count} notes, {daily_count} reading days.", flush=True)
     return counts
