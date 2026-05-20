@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import time
 
 from notion_client import Client
-from notion_client.errors import APIResponseError, RequestTimeoutError
+from notion_client.errors import APIResponseError, RequestTimeoutError, UnknownHTTPResponseError
 
 from .utils import (
     checkbox,
@@ -39,6 +39,7 @@ class NotionStore:
         self.client = Client(auth=token, timeout_ms=90000)
         self.page_id = extract_notion_page_id(page)
         self.databases = {}
+        self.page_cache = {}
 
     def setup(self, heatmap_url=""):
         self._load_child_databases()
@@ -160,7 +161,7 @@ class NotionStore:
             "链接": url(note.get("url")),
             "评分": number(note.get("star")),
         }
-        return self._upsert(self.databases[NOTES_DB], "Note ID", note["id"], props)
+        return self._upsert(self.databases[NOTES_DB], "Note ID", note["id"], props, update_existing=False)
 
     def upsert_daily(self, row):
         props = {
@@ -226,21 +227,40 @@ class NotionStore:
                     return block
         return None
 
-    def _upsert(self, database_id, key_property, key, properties, title_key=False):
-        if title_key:
-            filter_value = {"property": key_property, "title": {"equals": key}}
-        else:
-            filter_value = {"property": key_property, "rich_text": {"equals": key}}
-        response = self._query_database(database_id, filter_value)
-        results = response.get("results") or []
-        if results:
-            return self._notion(self.client.pages.update, page_id=results[0]["id"], properties=properties)
-        return self._notion(self.client.pages.create, parent=self._database_parent(database_id), properties=properties)
+    def _upsert(self, database_id, key_property, key, properties, title_key=False, update_existing=True):
+        cache_key = (database_id, key_property, "title" if title_key else "rich_text")
+        if cache_key not in self.page_cache:
+            self.page_cache[cache_key] = self._load_page_cache(database_id, key_property, title_key)
+        cache = self.page_cache[cache_key]
+        if key in cache:
+            if not update_existing:
+                return {"id": cache[key], "object": "page", "skipped": True}
+            return self._notion(self.client.pages.update, page_id=cache[key], properties=properties)
+        response = self._notion(self.client.pages.create, parent=self._database_parent(database_id), properties=properties)
+        cache[key] = response["id"]
+        return response
 
-    def _query_database(self, database_id, filter_value):
+    def _query_database(self, database_id, start_cursor=None):
+        kwargs = {"page_size": 100}
+        if start_cursor:
+            kwargs["start_cursor"] = start_cursor
         if self._uses_data_sources():
-            return self._notion(self.client.data_sources.query, data_source_id=database_id, filter=filter_value, page_size=1)
-        return self._notion(self.client.databases.query, database_id=database_id, filter=filter_value, page_size=1)
+            return self._notion(self.client.data_sources.query, data_source_id=database_id, **kwargs)
+        return self._notion(self.client.databases.query, database_id=database_id, **kwargs)
+
+    def _load_page_cache(self, database_id, key_property, title_key=False):
+        cache = {}
+        cursor = None
+        while True:
+            response = self._query_database(database_id, cursor)
+            for page in response.get("results") or []:
+                value = _property_text(page.get("properties", {}).get(key_property), title_key)
+                if value:
+                    cache[value] = page["id"]
+            if not response.get("has_more"):
+                break
+            cursor = response.get("next_cursor")
+        return cache
 
     def _database_parent(self, database_id):
         if self._uses_data_sources():
@@ -294,6 +314,8 @@ class NotionStore:
             try:
                 return func(**kwargs)
             except RequestTimeoutError as exc:
+                last_error = exc
+            except UnknownHTTPResponseError as exc:
                 last_error = exc
             except APIResponseError as exc:
                 code = getattr(getattr(exc, "code", ""), "value", getattr(exc, "code", ""))
@@ -416,3 +438,11 @@ def _plain_text_from_block(block):
         return ""
     payload = block.get(block_type) or {}
     return _plain_text(payload.get("rich_text") or payload.get("caption") or [])
+
+
+def _property_text(prop, title_key=False):
+    if not prop:
+        return ""
+    if title_key:
+        return _plain_text(prop.get("title") or [])
+    return _plain_text(prop.get("rich_text") or [])
