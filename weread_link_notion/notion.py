@@ -20,6 +20,7 @@ from .utils import (
 DASHBOARD_MARKER = "WeRead Link Notion"
 HEATMAP_MARKER = "WeRead Link Notion heatmap"
 DASHBOARD_SNAPSHOT_PREFIX = "最近同步 ·"
+DASHBOARD_TITLE_PREFIX = "微信读书阅读面板 ·"
 
 
 BOOKS_DB = "书库"
@@ -44,7 +45,6 @@ class NotionStore:
 
     def setup(self, heatmap_url=""):
         self._load_child_databases()
-        self._ensure_dashboard(heatmap_url)
         self._ensure_databases()
         return self.databases
 
@@ -76,13 +76,13 @@ class NotionStore:
                     continue
                 queryable_id = self._queryable_database_id(block["id"])
                 has_schema = self._database_has_properties(queryable_id, required)
-                has_rows = self._database_has_rows(queryable_id) if has_schema else False
+                row_count = self._database_row_count(queryable_id) if has_schema else 0
                 candidates[title_text].append(
                     {
                         "block_id": block["id"],
                         "queryable_id": queryable_id,
                         "has_schema": has_schema,
-                        "has_rows": has_rows,
+                        "row_count": row_count,
                     }
                 )
 
@@ -93,8 +93,7 @@ class NotionStore:
                     self._archive_block(block["block_id"])
                 continue
 
-            non_empty = [block for block in valid if block["has_rows"]]
-            chosen = (non_empty or valid)[-1]
+            chosen = sorted(valid, key=lambda block: block["row_count"])[-1]
             self.databases[title_text] = chosen["queryable_id"]
 
             if len(valid) <= 1:
@@ -102,8 +101,7 @@ class NotionStore:
             for block in blocks:
                 if block["block_id"] == chosen["block_id"]:
                     continue
-                if not block["has_schema"] or not block["has_rows"]:
-                    self._archive_block(block["block_id"])
+                self._archive_block(block["block_id"])
 
     def _walk_blocks(self, block_id):
         for block in self._children(block_id):
@@ -111,72 +109,59 @@ class NotionStore:
             if block.get("has_children") and block.get("type") != "child_database":
                 yield from self._walk_blocks(block["id"])
 
-    def _ensure_dashboard(self, heatmap_url):
-        has_marker = False
-        has_clean_intro = False
-        has_clean_heatmap_heading = False
-        for block in self._children(self.page_id):
-            text = _plain_text_from_block(block)
-            has_marker = has_marker or DASHBOARD_MARKER in text
-            has_clean_intro = has_clean_intro or "微信读书同步面板" in text
-            has_clean_heatmap_heading = has_clean_heatmap_heading or "阅读热力图" in text
-
-        children = []
-        if not has_marker:
-            children.append(_heading_1("WeRead Link Notion"))
-        if not has_clean_intro:
-            children.append(_callout("一个轻量的微信读书同步面板：热力图、书库、笔记、每日阅读和同步快照会在这里自动维护。"))
-        if not has_clean_heatmap_heading:
-            children.append(_heading_2("阅读热力图"))
-
-        if children:
-            self._notion(self.client.blocks.children.append, block_id=self.page_id, children=children)
-        if heatmap_url:
-            self.update_heatmap(heatmap_url)
-
-    def update_dashboard_snapshot(self, counts, books, notes, daily_rows):
-        self._delete_dashboard_snapshots()
+    def rebuild_dashboard(self, counts, books, notes, daily_rows, heatmap_url=""):
         now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
-        preview = [
+        anchor_id = self._find_managed_dashboard_anchor_id()
+        children = [
             _paragraph(
-                "本次已写入："
-                f"{counts.get('books', 0)} 本书、"
-                f"{counts.get('notes', 0)} 条笔记、"
-                f"{counts.get('read_days', 0)} 个阅读日、"
-                f"{counts.get('read_minutes', 0)} 分钟。"
+                "自动同步已经完成。完整数据在下方 4 个数据库中，这里只保留最常看的摘要和最近内容。"
             ),
-            _paragraph("完整内容在下方 4 个数据库中；这里显示最近内容，方便一打开页面就确认同步结果。"),
-            _heading_3("最近阅读"),
+            _paragraph(
+                f"书库 {counts.get('books', 0)} 本  ·  "
+                f"笔记 {counts.get('notes', 0)} 条  ·  "
+                f"阅读日 {counts.get('read_days', 0)} 天  ·  "
+                f"今年 {counts.get('read_minutes', 0)} 分钟"
+            ),
         ]
+        if heatmap_url:
+            children.extend([_divider(), _image_payload(heatmap_url)])
+
+        children.extend(
+            [
+                _divider(),
+                _heading_3("最近阅读"),
+            ]
+        )
         for book in _recent_books(books):
-            preview.append(_bulleted_list_item(_format_book_preview(book)))
-        if preview[-1].get("type") == "heading_3":
-            preview.append(_bulleted_list_item("暂时没有最近阅读书籍。"))
+            children.append(_bulleted_list_item(_format_book_preview(book)))
+        if children[-1].get("type") == "heading_3":
+            children.append(_bulleted_list_item("暂时没有最近阅读书籍。"))
 
-        preview.append(_heading_3("最近笔记"))
+        children.extend([_divider(), _heading_3("最近笔记")])
         for note in _recent_notes(notes):
-            preview.append(_bulleted_list_item(_format_note_preview(note)))
-        if preview[-1].get("type") == "heading_3":
-            preview.append(_bulleted_list_item("暂时没有笔记。"))
+            children.append(_bulleted_list_item(_format_note_preview(note)))
+        if children[-1].get("type") == "heading_3":
+            children.append(_bulleted_list_item("暂时没有笔记。"))
 
-        preview.append(_heading_3("最近阅读日"))
+        children.extend([_divider(), _heading_3("最近阅读日")])
         for row in _recent_daily_rows(daily_rows):
-            preview.append(_bulleted_list_item(_format_daily_preview(row)))
-        if preview[-1].get("type") == "heading_3":
-            preview.append(_bulleted_list_item("暂时没有每日阅读数据。"))
+            children.append(_bulleted_list_item(_format_daily_preview(row)))
+        if children[-1].get("type") == "heading_3":
+            children.append(_bulleted_list_item("暂时没有每日阅读数据。"))
 
-        snapshot = _quote(f"{DASHBOARD_SNAPSHOT_PREFIX} {now}", preview)
-        heatmap = self._find_heatmap_block()
-        kwargs = {"block_id": self.page_id, "children": [snapshot]}
-        if heatmap and self._is_direct_child_of_page(heatmap):
-            kwargs["after"] = heatmap["id"]
-        return self._notion(self.client.blocks.children.append, **kwargs)
-
-    def _delete_dashboard_snapshots(self):
-        for block in self._children(self.page_id):
-            text = _plain_text_from_block(block)
-            if text.startswith(DASHBOARD_SNAPSHOT_PREFIX):
-                self._archive_block(block["id"])
+        dashboard = _callout(
+            f"{DASHBOARD_TITLE_PREFIX}{now}",
+            icon="📖",
+            color="blue_background",
+            children=children,
+        )
+        kwargs = {"block_id": self.page_id, "children": [dashboard]}
+        if anchor_id:
+            kwargs["after"] = anchor_id
+        response = self._notion(self.client.blocks.children.append, **kwargs)
+        new_ids = {block["id"] for block in response.get("results") or []}
+        self._cleanup_managed_dashboard(exclude_ids=new_ids)
+        return response
 
     def _ensure_databases(self):
         specs = {
@@ -300,6 +285,39 @@ class NotionStore:
                     return block
         return None
 
+    def _find_managed_dashboard_anchor_id(self):
+        for block in self._children(self.page_id):
+            if self._is_managed_dashboard_block(block):
+                return block["id"]
+        return None
+
+    def _cleanup_managed_dashboard(self, exclude_ids=None):
+        exclude_ids = exclude_ids or set()
+        for block in self._children(self.page_id):
+            if block["id"] in exclude_ids:
+                continue
+            if self._is_managed_dashboard_block(block):
+                self._archive_block(block["id"])
+
+    def _is_managed_dashboard_block(self, block):
+        text = _plain_text_from_block(block)
+        if text.startswith(DASHBOARD_TITLE_PREFIX):
+            return True
+        if text.startswith(DASHBOARD_SNAPSHOT_PREFIX):
+            return True
+        if DASHBOARD_MARKER in text:
+            return True
+        if "微信读书同步面板" in text or text == "阅读热力图":
+            return True
+        if block.get("type") == "image":
+            return self._is_managed_heatmap_block(block)
+        return False
+
+    def _is_managed_heatmap_block(self, block):
+        caption = _plain_text(block.get("image", {}).get("caption") or [])
+        external = block.get("image", {}).get("external") or {}
+        return HEATMAP_MARKER in caption or "/assets/heatmap" in (external.get("url") or "")
+
     def _upsert(self, database_id, key_property, key, properties, title_key=False, update_existing=True):
         cache_key = (database_id, key_property, "title" if title_key else "rich_text")
         if cache_key not in self.page_cache:
@@ -321,16 +339,19 @@ class NotionStore:
             return self._notion(self.client.data_sources.query, data_source_id=database_id, **kwargs)
         return self._notion(self.client.databases.query, database_id=database_id, **kwargs)
 
-    def _database_has_rows(self, database_id):
+    def _database_row_count(self, database_id, limit=5000):
+        count = 0
+        cursor = None
         try:
-            kwargs = {"page_size": 1}
-            if self._uses_data_sources():
-                response = self._notion(self.client.data_sources.query, data_source_id=database_id, **kwargs)
-            else:
-                response = self._notion(self.client.databases.query, database_id=database_id, **kwargs)
+            while True:
+                response = self._query_database(database_id, cursor)
+                count += len(response.get("results") or [])
+                if count >= limit or not response.get("has_more"):
+                    break
+                cursor = response.get("next_cursor")
         except Exception:  # noqa: BLE001 - duplicate cleanup should not block syncing.
-            return False
-        return bool(response.get("results"))
+            return 0
+        return count
 
     def _load_page_cache(self, database_id, key_property, title_key=False):
         cache = {}
@@ -504,6 +525,10 @@ def _paragraph(text):
     return {"object": "block", "type": "paragraph", "paragraph": {"rich_text": _rt(text)}}
 
 
+def _divider():
+    return {"object": "block", "type": "divider", "divider": {}}
+
+
 def _bulleted_list_item(text):
     return {
         "object": "block",
@@ -519,11 +544,18 @@ def _quote(text, children=None):
     return {"object": "block", "type": "quote", "quote": payload}
 
 
-def _callout(text):
+def _callout(text, icon="📚", color="default", children=None):
+    payload = {
+        "rich_text": _rt(text),
+        "icon": {"type": "emoji", "emoji": icon},
+        "color": color,
+    }
+    if children:
+        payload["children"] = children
     return {
         "object": "block",
         "type": "callout",
-        "callout": {"rich_text": _rt(text), "icon": {"type": "emoji", "emoji": "📚"}},
+        "callout": payload,
     }
 
 

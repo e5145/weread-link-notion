@@ -79,7 +79,7 @@ def run_sync(config):
         "read_days": daily_count,
         "read_minutes": round(read_seconds / 60, 2),
     }
-    store.update_dashboard_snapshot(counts, books, notes, daily_rows)
+    store.rebuild_dashboard(counts, books, notes, daily_rows, config.heatmap_url)
     store.create_sync_run("success", counts, config.heatmap_url, "Sync completed.")
     print(f"Synced {book_count} books, {note_count} notes, {daily_count} reading days.", flush=True)
     return counts
