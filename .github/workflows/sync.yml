@@ -16,7 +16,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     env:
       WEREAD_API_KEY: ${{ secrets.WEREAD_API_KEY }}
       NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
@@ -25,6 +25,7 @@ jobs:
       MAX_NOTEBOOKS: ${{ vars.MAX_NOTEBOOKS || '0' }}
       GITHUB_REPOSITORY: ${{ github.repository }}
       GITHUB_REF_NAME: ${{ github.ref_name }}
+      PYTHONUNBUFFERED: "1"
 
     steps:
       - name: Checkout
